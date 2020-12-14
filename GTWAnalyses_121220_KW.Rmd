@@ -5,10 +5,6 @@ date: "12/11/2020"
 output: html_document
 ---
 
-#Here's a new RMarkdown file for GTW Analyses. I have not re-run any of the main analyses in this file yet but I've included histogram plots with age group faceting for each diectic time word in the calendar task. I also fixed the weird percentages the summary data.frame was spitting out. (5YO give placement for 'tomorrow' consistent with its correct location 70% of the time and give response consistent with the diectic status of tomorrow 85% of the time). To get the new percentages I: 
-1. updated the variable 'response' to aggregate response1 and response2 for both language groups (previously the code was aggregating response1 and response2 for the English speaking sample but not the German speaking sample). 
-2. updated the 'correctr' variable (correct box and/or order placement). I'm not sure if this was initially done by hand or not, but it looked like there may have been a few errors. I created a new variable 'corrrectR' but I'd like to go over this together to make sure I coded it correctly since i'm less familiar with the tasks. Once we're confident in the new 'correctR' variable, I'll remove 'correctr' to avoid confusion later.  
-
 1. Load packages
 ```{r, echo = FALSE}
 library(tidyverse)
