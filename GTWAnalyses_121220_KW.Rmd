@@ -1,0 +1,216 @@
+---
+title: "GTW Analyses"
+author: "KWilliams"
+date: "12/11/2020"
+output: html_document
+---
+
+#Here's a new RMarkdown file for GTW Analyses. I have not re-run any of the main analyses in this file yet but I've included histogram plots with age group faceting for each diectic time word in the calendar task. I also fixed the weird percentages the summary data.frame was spitting out. (5YO give placement for 'tomorrow' consistent with its correct location 70% of the time and give response consistent with the diectic status of tomorrow 85% of the time). To get the new percentages I: 
+1. updated the variable 'response' to aggregate response1 and response2 for both language groups (previously the code was aggregating response1 and response2 for the English speaking sample but not the German speaking sample). 
+2. updated the 'correctr' variable (correct box and/or order placement). I'm not sure if this was initially done by hand or not, but it looked like there may have been a few errors. I created a new variable 'corrrectR' but I'd like to go over this together to make sure I coded it correctly since i'm less familiar with the tasks. Once we're confident in the new 'correctR' variable, I'll remove 'correctr' to avoid confusion later.  
+
+1. Load packages
+```{r, echo = FALSE}
+library(tidyverse)
+library(lme4)
+library(ggplot2)
+library(reshape2)
+```
+
+2. Read in the German language data
+```{r}
+#Note that 999 indicates missing data
+d.g <- read.csv('/Users/kwilliams/Documents/Austin Thought Lab/GTW/german_12112019.csv')
+d.g <- d.g %>%      
+  select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
+  rename('response1' = 'response.1') %>%
+  mutate(language = 'german')
+
+
+#replace missing data and empty cells with NA
+d.g[d.g == "999"] <- NA 
+d.g[d.g == ""] <- NA
+
+#aggregate response1 and respnse 2 columns
+d.g <- d.g %>%
+mutate(response = ifelse(is.na(response2) == T, response1, response2))
+```
+
+3. Read in the English language data
+```{r}
+#Note that 999 indicates missing data
+d.e <- read.csv('/Users/kwilliams/Documents/Austin Thought Lab/GTW/data_austin121119.csv')
+d.e <- d.e %>%
+  #remove unnecessary columns
+  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -comments, -covered) %>%
+  mutate(language = 'english')
+  #commented this last line out because it's already coded in the data file
+
+
+#replace missing data and empty cells with NA
+d.e[d.e == "999"] <- NA 
+d.e[d.e == ""] <- NA
+
+#aggregate response1 and respnse 2 columns
+d.e <- d.e %>%
+mutate(response = ifelse(is.na(response2) == T, response1, response2))
+```
+
+4. Combine german and english data and fix typos in data entry
+```{r}
+d.all <- rbind(d.g, d.e) %>% 
+  mutate(item = as.factor(item),
+         item = recode_factor(item, 'morning ' = 'thismorning',
+                                      'twodaysago' = 'beforeyesterday', 
+                                      'dayokweek' = 'daysofweek',
+                                      'last year' = 'lastyear',
+                                      'twofromnow' = 'aftertomorrow',
+                                      'twoago' = 'beforeyesterday',
+                                      'inaday' = 'tomorrow',
+                                      'dayago' = 'yesterday',
+                                      'onedayfromnow' = 'tomorrow',
+                                      'thisevening' = 'tonight'),
+        language = as.factor(language),
+        exclude = replace_na(exclude, 0))
+```
+
+5. Code all future time words
+```{r}
+future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') 
+```
+
+6. Code correct responses (to compare to correctr variable)
+```{r}
+d.all <- d.all %>%
+  mutate(correctR = case_when(task == "calendar" & item == "tomorrow" ~ '5',
+                              task == "calendar" & item == "yesterday" ~ '3',
+                              task == "calendar" & item == "aftertomorrow" ~ '6',
+                              task == "calendar" & item == "beforeyesterday" ~ '2',
+                              task == "calendar" & item == "daysofweek" ~ '7',
+                              task == "calendar" & item == "beforetoday" ~ '3',
+                              task == "calendar" & item == "today" ~ '4',
+                              task == "calendar" & item == "aftertoday" ~ '5',
+                              task == "timeline" & item == "lastbday" ~ '1',
+                              task == "timeline" & item == "breakfast" ~ '2',
+                              task == "timeline" & item == "dinner" ~ '3', 
+                              task == "timeline" & item == "nextbday" ~ '4',
+                              task == "timeline" & item == "lastweek" ~ '1',
+                              task == "timeline" & item == "thismorning" ~ '2',
+                              task == "timeline" & item == "tonight" ~ '3',
+                              task == "timeline" & item == "tomorrow" ~ '4',
+                              task == "timeline" & item == "lastyear" ~ '1',
+                              task == "timeline" & item == "yesterday" ~ '2',
+                              task == "timeline" & item == "nextweek" ~ '3',
+                              task == "timeline" & item == "nextyear" ~ '4',
+                              task == "timeline" & item == "beforeyesterday" ~ '1',
+                              task == "timeline" & item == "yesterday" ~ '2',
+                              task == "timeline" & item == "tomorrow" ~ '3',
+                              task == "timeline" & item == "aftertomorrow" ~ '4'))
+##the results here do not match the column correctr (handcoded?) that already exists in the data file. At least for now, I'm going to stick with using this coded variable rather than the one in the data file. (check with Katharine before removing the correctr column)
+```
+
+7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
+```{r}
+d.all <- d.all %>%
+  filter(exclude==0) %>%
+  mutate(response = as.numeric(response),
+         correctR = as.numeric(correctR),
+         order = as.factor(order),
+         agegroup = as.factor(agegroup),
+         linenum = as.factor(linenum),
+         #create variable and code whether the item was placed in the correct rank (timeline task) or box (calendar task)
+         correct = ifelse(response == correctR, 1, 0),
+         #create variable to quantify how far the rank/box placement was from the correct rank/box
+         dist.error = correctR - response,
+         #create variable ignoring the direction of the error
+         dist.error.a = abs(dist.error),
+         #create variable and code whether the item was placed in the future (diectic status of response)
+         resp.stat = case_when(task=='timeline' & distfrommid > 0 ~ 1,
+                                 task=='calendar' & response > 4 ~ 1,
+                                 task=='verbal' & item == 'today' & response > correctR ~ 1, 
+                               TRUE ~ 0), #"what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
+         #create variable and code whether the items correct placement is in the future
+         item.stat = ifelse(item %in% future.words, 1, 0),
+         #create variable and code whether the participant correctly placed the item in the past vs. future
+         stat.correct = ifelse(item.stat == resp.stat, 1, 0))
+```
+
+8. Participant counts
+```{r}
+subs <- d.all %>%
+  select(subjid, agegroup, language) %>%
+  group_by(agegroup, language) %>%
+  distinct
+count.cond.subs <- subs %>%
+  group_by(agegroup, language) %>%
+  summarise(n=n(), .groups = "keep")
+
+#Make sure these counts line up with what Katharine expects/has on record (e.g., only 4 usuable 7YO tested in English?)
+```
+
+9. Calendar task only 
+```{r}
+cal.d <- d.all %>%
+  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+  select(-linelength,-distfrommid) %>%
+  mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
+         #response = as.numeric(response), #this is redundant 
+         cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))  
+
+cal.sum <- cal.d %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
+   group_by(language, agegroup, item) %>%
+  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            rank.m = mean(correct))  # right box (final answer)
+```
+
+Calendar task only: Frequency distribution of box placement for each time word
+```{r}
+#First Response ONly for item = beforeyesterday (1)
+cal.d1 <- cal.d %>%
+  filter (item == "beforeyesterday")
+#histogram
+ggplot(cal.d1, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement for 'before yesterday'") +
+  facet_grid(.~ agegroup)
+
+#First Response ONly for item = yesterday (2)
+cal.d2 <- cal.d %>%
+  filter(item =="yesterday")
+#histogram
+ggplot(cal.d2, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement for 'yesterday'") +
+  facet_grid(.~ agegroup)
+
+#First Response Only for item = tomorrow (3)
+cal.d3 <- cal.d %>%
+  filter(item =="tomorrow")
+#histogram  *Did 5YO place 'tomorrow' in the correct box? YES!
+ggplot(cal.d3, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement for 'tomorrow'") +
+  facet_grid(.~ agegroup)
+#histogram  *Did 5YO place 'tomorrow' in future? YES!
+ggplot(cal.d3, aes(x=resp.stat)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("deictic status response for 'tomorrow'") +
+  facet_grid(.~ agegroup)
+
+#First Response Only for item = aftertomorrow (4)
+cal.d4 <- cal.d %>%
+  filter(item =="aftertomorrow")
+#histogram
+ggplot(cal.d4, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement for 'after tomorrow'") +
+  facet_grid(.~ agegroup)
+```
+
