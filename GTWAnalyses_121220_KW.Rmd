@@ -8,6 +8,7 @@ output: html_document
 1. Load packages
 ```{r, echo = FALSE}
 library(tidyverse)
+library(nloptr) #needed in order to call lme4
 library(lme4)
 library(ggplot2)
 library(reshape2)
@@ -16,7 +17,7 @@ library(reshape2)
 2. Read in the German language data
 ```{r}
 #Note that 999 indicates missing data
-d.g <- read.csv('/Users/kwilliams/Documents/Austin Thought Lab/GTW/german_12112019.csv')
+d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
   rename('response1' = 'response.1') %>%
@@ -35,7 +36,7 @@ mutate(response = ifelse(is.na(response2) == T, response1, response2))
 3. Read in the English language data
 ```{r}
 #Note that 999 indicates missing data
-d.e <- read.csv('/Users/kwilliams/Documents/Austin Thought Lab/GTW/data_austin121119.csv')
+d.e <- read.csv('data_austin121119.csv')
 d.e <- d.e %>%
   #remove unnecessary columns
   select(-ID,-dob, -dot, -agedays, -monolingual, -site, -comments, -covered) %>%
@@ -208,5 +209,17 @@ ggplot(cal.d4, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement for 'after tomorrow'") +
   facet_grid(.~ agegroup)
+```
+
+Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
+```{r}
+cal.lm = glmer(cor.first ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
+summary(cal.lm)
+```
+
+Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
+```{r}
+d.lm = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
+summary(d.lm)
 ```
 
