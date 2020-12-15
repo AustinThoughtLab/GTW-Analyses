@@ -41,8 +41,6 @@ d.e <- d.e %>%
   #remove unnecessary columns
   select(-ID,-dob, -dot, -agedays, -monolingual, -site, -comments, -covered) %>%
   mutate(language = 'english')
-  #commented this last line out because it's already coded in the data file
-
 
 #replace missing data and empty cells with NA
 d.e[d.e == "999"] <- NA 
@@ -53,7 +51,7 @@ d.e <- d.e %>%
 mutate(response = ifelse(is.na(response2) == T, response1, response2))
 ```
 
-4. Combine german and english data and fix typos in data entry
+4. Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)
 ```{r}
 d.all <- rbind(d.g, d.e) %>% 
   mutate(item = as.factor(item),
@@ -68,7 +66,14 @@ d.all <- rbind(d.g, d.e) %>%
                                       'onedayfromnow' = 'tomorrow',
                                       'thisevening' = 'tonight'),
         language = as.factor(language),
+        itemnum = as.factor(itemnum),
         exclude = replace_na(exclude, 0))
+
+d.all$weekday <- ifelse(d.all$weekday == "1", 7, ifelse(d.all$weekday == "2", 1, ifelse(d.all$weekday == "3", 2, ifelse(d.all$weekday == "4", 3, ifelse(d.all$weekday == "5", 4, ifelse(d.all$weekday == "6", 5, ifelse(d.all$weekday == "7", 6, 999)))))))
+        #the weekday function in excel codes everything as 1-7 from Sun-Sat so here I am just re-coding so the              variable levels match our calendar task (e.g., 1-7 from Mon-Sun)
+
+#replace missing data with NA
+d.all$weekday[d.all$weekday == "999"] <- NA 
 ```
 
 5. Code all future time words
@@ -76,34 +81,56 @@ d.all <- rbind(d.g, d.e) %>%
 future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') 
 ```
 
-6. Code correct responses (to compare to correctr variable)
+6. Code correct responses (to compare to correctr variable) [Is there an easier way to do this?!]
 ```{r}
 d.all <- d.all %>%
-  mutate(correctR = case_when(task == "calendar" & item == "tomorrow" ~ '5',
-                              task == "calendar" & item == "yesterday" ~ '3',
-                              task == "calendar" & item == "aftertomorrow" ~ '6',
-                              task == "calendar" & item == "beforeyesterday" ~ '2',
-                              task == "calendar" & item == "daysofweek" ~ '7',
-                              task == "calendar" & item == "beforetoday" ~ '3',
-                              task == "calendar" & item == "today" ~ '4',
-                              task == "calendar" & item == "aftertoday" ~ '5',
-                              task == "timeline" & item == "lastbday" ~ '1',
-                              task == "timeline" & item == "breakfast" ~ '2',
-                              task == "timeline" & item == "dinner" ~ '3', 
-                              task == "timeline" & item == "nextbday" ~ '4',
-                              task == "timeline" & item == "lastweek" ~ '1',
-                              task == "timeline" & item == "thismorning" ~ '2',
-                              task == "timeline" & item == "tonight" ~ '3',
-                              task == "timeline" & item == "tomorrow" ~ '4',
-                              task == "timeline" & item == "lastyear" ~ '1',
-                              task == "timeline" & item == "yesterday" ~ '2',
-                              task == "timeline" & item == "nextweek" ~ '3',
-                              task == "timeline" & item == "nextyear" ~ '4',
-                              task == "timeline" & item == "beforeyesterday" ~ '1',
-                              task == "timeline" & item == "yesterday" ~ '2',
-                              task == "timeline" & item == "tomorrow" ~ '3',
-                              task == "timeline" & item == "aftertomorrow" ~ '4'))
-##the results here do not match the column correctr (handcoded?) that already exists in the data file. At least for now, I'm going to stick with using this coded variable rather than the one in the data file. (check with Katharine before removing the correctr column)
+  mutate(correctR = case_when(task == "calendar" & itemtype == "deictic" & item == "yesterday" ~ '3',
+                              task == "calendar" & itemtype == "deictic" & item == "beforeyesterday" ~ '2',
+                              task == "calendar" & itemtype == "deictic" & item == "tomorrow" ~ '5',
+                              task == "calendar" & itemtype == "deictic" & item == "aftertomorrow" ~ '6',
+                              task == "calendar" & itemtype == "verbal" & item == "aftertoday" ~ '1',
+                              task == "calendar" & itemtype == "verbal" & item == "beforetoday" ~ '2',
+                              task == "calendar" & itemtype == "verbal" & item == "daysofweek" ~ '1',
+                              #assuming a 1 indicates that the child correctly identified all 7 days of the week
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "1" ~ "1",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "2" ~ "2",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "3" ~ "3",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "4" ~ "4",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "5" ~ "5",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "6" ~ "6",
+                              task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "7" ~ "7",
+                              #remember that weekday values range from 1-7 and correspond to days of the week (e.g.,                               Monday = 1, Tuesday = 2, etc.)
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "1" ~ '7',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "2" ~ '1',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "3" ~ '2',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "4" ~ '3',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "5" ~ '4',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "6" ~ '5',
+                              task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "7" ~ '6',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "1" ~ '2',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "2" ~ '3',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "3" ~ '4',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "4" ~ '5',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "5" ~ '6',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "6" ~ '7',
+                              task == "calendar" & itemtype =="verbal" & item =="tomorrow" & weekday == "7" ~ '1',
+                              task == "timeline" & linenum == "1" & item == "lastbday" ~ '1',
+                              task == "timeline" & linenum == "1" & item == "breakfast" ~ '2',
+                              task == "timeline" & linenum == "1" & item == "dinner" ~ '3', 
+                              task == "timeline" & linenum == "1" & item == "nextbday" ~ '4',
+                              task == "timeline" & linenum == "2" & item == "lastweek" ~ '1',
+                              task == "timeline" & linenum == "2" & item == "thismorning" ~ '2',
+                              task == "timeline" & linenum == "2" & item == "tonight" ~ '3',
+                              task == "timeline" & linenum == "2" & item == "tomorrow" ~ '4',
+                              task == "timeline" & linenum == "3" & item == "lastyear" ~ '1',
+                              task == "timeline" & linenum == "3" & item == "yesterday" ~ '2',
+                              task == "timeline" & linenum == "3" & item == "nextweek" ~ '3',
+                              task == "timeline" & linenum == "3" & item == "nextyear" ~ '4',
+                              task == "timeline" & linenum == "4" & item == "beforeyesterday" ~ '1',
+                              task == "timeline" & linenum == "4" & item == "yesterday" ~ '2',
+                              task == "timeline" & linenum == "4" & item == "tomorrow" ~ '3',
+                              task == "timeline" & linenum == "4" & item == "aftertomorrow" ~ '4'))
+##seems to match correctr variable that already exists in the data file with two exceptions: 'weekdays' is coded as 1 = correctly named all 7 days and 0 = incorrectly named all 7 days; and verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
 ```
 
 7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
