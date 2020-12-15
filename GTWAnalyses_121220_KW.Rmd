@@ -27,7 +27,7 @@ d.g <- d.g %>%
 d.g[d.g == "999"] <- NA 
 d.g[d.g == ""] <- NA
 
-#aggregate response1 and respnse 2 columns
+#aggregate response1 and response 2 columns
 d.g <- d.g %>%
 mutate(response = ifelse(is.na(response2) == T, response1, response2))
 ```
