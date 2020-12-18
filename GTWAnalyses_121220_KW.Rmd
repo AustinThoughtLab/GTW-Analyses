@@ -12,6 +12,7 @@ library(nloptr) #needed in order to call lme4
 library(lme4)
 library(ggplot2)
 library(reshape2)
+library(ggpubr)
 ```
 
 2. Read in the German language data
@@ -181,7 +182,8 @@ cal.d <- d.all %>%
          #response = as.numeric(response), #this is redundant 
          cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))  
+         prox = as.factor(prox))
+
 
 cal.sum <- cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
@@ -194,48 +196,39 @@ cal.sum <- cal.d %>%
             rank.m = mean(correct))  # right box (final answer)
 ```
 
+
 Calendar task only: Frequency distribution of box placement for each time word
 ```{r}
-#First Response ONly for item = beforeyesterday (1)
-cal.d1 <- cal.d %>%
-  filter (item == "beforeyesterday")
-#histogram
-ggplot(cal.d1, aes(x=response1)) +
-  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement for 'before yesterday'") +
-  facet_grid(.~ agegroup)
+#filter by language
+cal.e <- cal.d %>%
+  filter(language == "english") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-#First Response ONly for item = yesterday (2)
-cal.d2 <- cal.d %>%
-  filter(item =="yesterday")
-#histogram
-ggplot(cal.d2, aes(x=response1)) +
-  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement for 'yesterday'") +
-  facet_grid(.~ agegroup)
+cal.g <- cal.d %>%
+  filter(language == "german") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-#First Response Only for item = tomorrow (3)
-cal.d3 <- cal.d %>%
-  filter(item =="tomorrow")
-#histogram  *Did 5YO place 'tomorrow' in the correct box? YES!
-ggplot(cal.d3, aes(x=response1)) +
-  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement for 'tomorrow'") +
-  facet_grid(.~ agegroup)
-#histogram  *Did 5YO place 'tomorrow' in future? YES!
-ggplot(cal.d3, aes(x=resp.stat)) +
-  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("deictic status response for 'tomorrow'") +
-  facet_grid(.~ agegroup)
+#Frequency distributions of first response only
 
-#First Response Only for item = aftertomorrow (4)
-cal.d4 <- cal.d %>%
-  filter(item =="aftertomorrow")
-#histogram
-ggplot(cal.d4, aes(x=response1)) +
+par(mfrow=c(1,1))
+E <- ggplot(cal.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement for 'after tomorrow'") +
-  facet_grid(.~ agegroup)
+  xlab("box placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 30) +
+  facet_grid(item ~ agegroup)
+
+G <- ggplot(cal.g, aes(x=response1)) +
+  geom_histogram(position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement") +
+  ggtitle("German Speakers") +
+  ylim(0, 30) +
+  facet_grid(item ~ agegroup)
+
+histograms <- ggarrange(E, G, 
+          ncol = 1, nrow = 2)
+
+ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi = 300)
 ```
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
@@ -248,5 +241,59 @@ Calendar Task: does language spoken or age (in years) predict successful placeme
 ```{r}
 d.lm = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
 summary(d.lm)
+```
+
+```{r}
+#-language:prox:ageyears 
+verbal <- d.all %>%
+  filter(itemtype=="verbal" & agegroup %in% c('4','5') & item=="daysofweek") %>%
+  group_by(language, item) %>%
+  summarize(correct.m <- mean(correct))
+
+### plot correct first placements (Did they give correct response first time)
+ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=language, color=language)) +
+  geom_line(aes(color=language))+
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1) +
+  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
+facet_wrap( ~ item, nrow=2) 
+```
+```{r}
+### plot correct status
+ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language)) +
+  geom_line(aes(color=language))+
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1) +
+  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
+  facet_wrap( ~ item, nrow=2) 
+```
+
+### if child places aftertomorrow in the correct location, how likely are they to also place tomorrow in the same location? 
+```{r}
+
+#create new data frame
+cal.e <- cal.d %>%
+  select (subjid, agegroup, item, correct)
+#transpose item (i.e., transform from long to wide format)
+cal.e.T <- reshape(cal.e, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+
+
+
+### not sure what this histogram is showing
+#ggplot(cal.tomorrow, aes(x=both.correct)) +
+  #geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  #xlab("both correct") +
+  #facet_grid(language ~ agegroup)
+
+### plot correct first placements (Did they give correct response first time)
+#ggplot(data=tomorrow.sum, aes(x=agegroup, y=both.correct.m)) +
+  #geom_line()+
+  #geom_point() +
+  #ylab('prop correct') +
+  #ylim(0,1) +
+  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
+#facet_wrap( ~ language, nrow=2) 
 ```
 
