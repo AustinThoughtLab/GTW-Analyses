@@ -354,6 +354,34 @@ ggplot(data=cal.allTrecoded, aes(x = BothCorr)) +
   geom_bar() +
   geom_text(stat='count', aes(label = ..count..), vjust = -1) +
   facet_wrap(~item, nrow = 4)
+###plot proportion of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow Qs, yesterday Qs.
+#cal.allTrecoded$BothCorrF = as.factor(cal.allTrecoded$BothCorr)
+
+#cal.allTrecoded %>%
+  #mutate(BothCorrF = as.factor(BothCorr),
+         #BothCorrF = recode_factor(BothCorrF, '1' = 'True',
+                                   '0' = 'False'))
+
+#as.factor(cal.allTrecoded$BothCorr)
+#cal.allTrecoded %>%
+  #mutate(BothCorr = recode_factor(BothCorr, '1' = "TRUE", 
+                       '0' = "FALSE"))
+
+#d.all <- rbind(d.g, d.e) %>% 
+  #mutate(item = as.factor(item),
+         #item = recode_factor(item, 'morning ' = 'thismorning',
+                                      #'twodaysago' = 'beforeyesterday', 
+                                      #'dayokweek' = 'daysofweek',
+                                      #'last year' = 'lastyear',
+                                      #'twofromnow' = 'aftertomorrow',
+                                      #'twoago' = 'beforeyesterday',
+                                      #'inaday' = 'tomorrow',
+                                      #'dayago' = 'yesterday',
+                                      #'onedayfromnow' = 'tomorrow',
+                                      #'thisevening' = 'tonight'),
+
+#ggplot(cal.allTrecoded, aes(x=item, fill = BothCorr)) +
+  #geom_bar(position = "fill")
 
 ### plot correct first placements (Did they give correct response first time)
 #ggplot(data=tomorrow.sum, aes(x=agegroup, y=both.correct.m)) +

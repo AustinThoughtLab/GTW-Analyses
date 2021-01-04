@@ -1,4 +1,4 @@
-subjid,dob,dot,weekday,agedays,agemonths,ageyears,agegroup,language,monolingual,order,timelinefirst,task,linenum,itemtype,itemnum,item,linelength,distfrommid,response ,response 1,response2,correctr,prompts,comments,exclude,,,,,
+subjid,dob,dot,weekday,agedays,agemonths,ageyears,agegroup,language,monolingual,order,timelinefirst,task,linenum,itemtype,itemnum,item,linelength,distfrommid,response ,response1,response2,correctr,prompts,comments,exclude,,,,,
 E07FI,,1/18/19,6,,41,3.5,3,german,1,1,1,timeline,1,event,1,breakfast,14,6.2,4,4,,2,,,,,,,,
 E07FI,,1/18/19,6,,41,3.5,3,german,1,1,1,timeline,1,event,2,nextbday,14,-2.9,1,1,,4,,,,,,,,
 E07FI,,1/18/19,6,,41,3.5,3,german,1,1,1,timeline,1,event,3,dinner,14,2,3,3,,3,,,,,,,,
