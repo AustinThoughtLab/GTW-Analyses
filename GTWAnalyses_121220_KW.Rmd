@@ -22,7 +22,6 @@ library(dplyr)
 d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
-  rename('response1' = 'response.1') %>%
   mutate(language = 'german')
 
 
@@ -167,10 +166,10 @@ subs <- d.all %>%
   select(subjid, agegroup, language) %>%
   group_by(agegroup, language) %>%
   distinct
-count.cond.subs <- subs %>%
+subs_counts <- subs %>%
   group_by(agegroup, language) %>%
-  summarise(n=n(), .groups = "keep")
-
+  summarize(n())
+  
 #Make sure these counts line up with what Katharine expects/has on record (e.g., only 4 usuable 7YO tested in English?)
 ```
 
@@ -210,7 +209,6 @@ cal.g <- cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 #Frequency distributions of first response only
-
 par(mfrow=c(1,1))
 E <- ggplot(cal.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
@@ -240,9 +238,20 @@ cal.lm = glmer(cor.first ~ language*prox+ageyears*prox + (1|subjid), family='bin
 summary(cal.lm)
 ```
 
+Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
+```{r}
+cal.lm = glmer(cor.first ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
+summary(cal.lm)
+```
+
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
 ```{r}
 d.lm = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
+summary(d.lm)
+```
+Calendar Task: does language spoken or age (in years) predict successful placement of time words?
+```{r}
+d.lm = glmer(stat.correct ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
 summary(d.lm)
 ```
 
@@ -273,7 +282,7 @@ ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language
   facet_wrap( ~ item, nrow=2) 
 ```
 
-### if child places aftertomorrow in the correct location, how likely are they to also place tomorrow in the same location? 
+###Did children place both items in a pair in the correct location? (e.g., tomorrow/after tomorrow, yesterday/before yesterday, proximal terms, distal terms)
 ```{r}
 #create new data frame
 cal.allT <- cal.d %>%
@@ -355,41 +364,29 @@ ggplot(data=cal.allTrecoded, aes(x = BothCorr)) +
   geom_text(stat='count', aes(label = ..count..), vjust = -1) +
   facet_wrap(~item, nrow = 4)
 ###plot proportion of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow Qs, yesterday Qs.
-#cal.allTrecoded$BothCorrF = as.factor(cal.allTrecoded$BothCorr)
-
-#cal.allTrecoded %>%
-  #mutate(BothCorrF = as.factor(BothCorr),
-         #BothCorrF = recode_factor(BothCorrF, '1' = 'True',
-                                   '0' = 'False'))
-
-#as.factor(cal.allTrecoded$BothCorr)
-#cal.allTrecoded %>%
-  #mutate(BothCorr = recode_factor(BothCorr, '1' = "TRUE", 
-                       '0' = "FALSE"))
-
-#d.all <- rbind(d.g, d.e) %>% 
-  #mutate(item = as.factor(item),
-         #item = recode_factor(item, 'morning ' = 'thismorning',
-                                      #'twodaysago' = 'beforeyesterday', 
-                                      #'dayokweek' = 'daysofweek',
-                                      #'last year' = 'lastyear',
-                                      #'twofromnow' = 'aftertomorrow',
-                                      #'twoago' = 'beforeyesterday',
-                                      #'inaday' = 'tomorrow',
-                                      #'dayago' = 'yesterday',
-                                      #'onedayfromnow' = 'tomorrow',
-                                      #'thisevening' = 'tonight'),
-
-#ggplot(cal.allTrecoded, aes(x=item, fill = BothCorr)) +
-  #geom_bar(position = "fill")
+##1 = both correct, 0 = one or more incorrect responses for paired stimuli (e.g., tomorrow & day after tomorrow)
+cal.allTrecoded[,'BothCorrF'] <- as.factor(cal.allTrecoded[,'BothCorr'])
+Prop_Graph <- ggplot(cal.allTrecoded, aes(x=item, fill = BothCorrF)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  ylab('proportion of participants') +
+  facet_wrap(~agegroup)
+```
 
 ### plot correct first placements (Did they give correct response first time)
-#ggplot(data=tomorrow.sum, aes(x=agegroup, y=both.correct.m)) +
-  #geom_line()+
-  #geom_point() +
-  #ylab('prop correct') +
-  #ylim(0,1) +
-  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
-#facet_wrap( ~ language, nrow=2) 
+```{r}
+ggplot(data=cal.sum, aes(x=item, y=first.m)) +
+  geom_line()+
+  geom_point() +
+  ylab('prop correct on first try') +
+  ylim(0,1) +
+  geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
+  facet_wrap( agegroup ~ language, nrow=3) 
+
+#What are errors based on? distance from today?
+first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            se.correct = sd.correct/sqrt(n),
+            deictic.m = mean(stat.correct), # average #participants who got correct status
 ```
 
