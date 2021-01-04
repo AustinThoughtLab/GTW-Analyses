@@ -13,6 +13,7 @@ library(lme4)
 library(ggplot2)
 library(reshape2)
 library(ggpubr)
+library(dplyr)
 ```
 
 2. Read in the German language data
@@ -228,6 +229,8 @@ G <- ggplot(cal.g, aes(x=response1)) +
 histograms <- ggarrange(E, G, 
           ncol = 1, nrow = 2)
 
+histograms
+
 ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi = 300)
 ```
 
@@ -272,20 +275,85 @@ ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language
 
 ### if child places aftertomorrow in the correct location, how likely are they to also place tomorrow in the same location? 
 ```{r}
-
 #create new data frame
-cal.e <- cal.d %>%
-  select (subjid, agegroup, item, correct)
+cal.allT <- cal.d %>%
+  select (subjid, agegroup, language, item, correct)
 #transpose item (i.e., transform from long to wide format)
-cal.e.T <- reshape(cal.e, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+cal.allT <- reshape(cal.e, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
 
+#Code for tomorrow & yesterday both correct (proxCorr = 1)
+cal.allT <- cal.allT %>%
+  mutate(proxCorr = case_when(correct.tomorrow == "1" & correct.yesterday == "1" ~ 1, TRUE ~ 0)) %>%
+#Code for after tomorrow & before yesterday both correct (distCorr = 1)
+  mutate(distCorr = case_when(correct.aftertomorrow == "1" & correct.beforeyesterday == "1" ~ 1, TRUE ~ 0)) %>%
+#Code for tomorrow & after tomorrow correct (tomorrow2Corr = 1)
+  mutate(tomorrow2Corr = case_when(correct.tomorrow == "1" & correct.aftertomorrow == "1" ~ 1, TRUE ~ 0)) %>%
+#Code for yesterday & before yesterday correct (yesterday2Corr = 1)
+  mutate(yesterday2Corr = case_when(correct.yesterday == "1" & correct.beforeyesterday == "1" ~ 1, TRUE ~ 0))
 
+#create new data frame (again) and transpose from wide format back to long format
+cal.allTrecoded <- cal.allT %>%
+  select(subjid, agegroup, language, proxCorr, distCorr, tomorrow2Corr, yesterday2Corr)
+cal.allTrecoded <- reshape(cal.allTrecoded,
+                           idvar = "subjid", 
+                           varying = list(c(4, 5, 6, 7)), 
+                           direction = "long", 
+                           v.names = c('BothCorr'), 
+                           timevar = "Pair")
+#rename values in 'Pair' variable column
+cal.allTrecoded <- cal.allTrecoded %>%
+  mutate(Pair = as.factor(Pair), 
+         item = recode_factor(Pair, '1' = 'proxCorr', 
+                              '2' = 'distCorr', 
+                              '3' = 'tomorrow2Corr', 
+                              '4' = 'yesterday2Corr'))
 
-### not sure what this histogram is showing
-#ggplot(cal.tomorrow, aes(x=both.correct)) +
-  #geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  #xlab("both correct") +
-  #facet_grid(language ~ agegroup)
+#counts just to make sure data was transposed correctly (without error)
+#counts for wide data frame (English Ps only)
+#proxCorr_countsWide <- cal.allT %>%
+  #filter(language == "english") %>%
+  #group_by(agegroup, proxCorr) %>%
+  #summarise(Freq=n())
+#distCorr_countsWide <- cal.allT %>%
+  #filter(language == "english") %>%
+  #group_by(agegroup,distCorr) %>%
+  #summarise(Freq=n())
+#tomorrow2Corr.countsWide <- cal.allT %>%
+  #filter(language == "english") %>%
+  #group_by(agegroup, tomorrow2Corr) %>%
+  #summarise(Freq=n())
+#yesterday2Corr.countsWide <- cal.allT %>%
+  #filter(language == "english") %>%
+  #group_by(agegroup, yesterday2Corr) %>%
+  #summarise(Freq=n())
+
+#counts for long data frame
+#proxCorr_countsLong <- cal.allTrecoded %>%
+  #filter(language == "english", item == "proxCorr") %>%
+  #group_by(agegroup, BothCorr) %>%
+  #summarise(Freq=n())
+#distCorr_countsLong <- cal.allTrecoded %>%
+  #filter(language == "english", item == "distCorr") %>%
+  #group_by(agegroup, BothCorr) %>%
+  #summarise(Freq=n())
+#tomorrow2corr_countsLong <- cal.allTrecoded %>%
+  #filter(language == "english", item == "tomorrow2Corr") %>%
+  #group_by(agegroup, BothCorr) %>%
+  #summarise(Freq=n())
+#yesterday2Corr_countsLong <- cal.allTrecoded %>%
+  #filter(language == "english", item == "yesterday2Corr") %>%
+  #group_by(agegroup, BothCorr) %>%
+  #summarise(Freq=n())
+
+###plot # of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow/after tomorrow Qs, yesterday/before yesterday Qs.
+ggplot(cal.allTrecoded, aes(x=BothCorr)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 0.5) +
+  xlab("1 = both correct") +
+  facet_grid(item ~ agegroup)
+ggplot(data=cal.allTrecoded, aes(x = BothCorr)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label = ..count..), vjust = -1) +
+  facet_wrap(~item, nrow = 4)
 
 ### plot correct first placements (Did they give correct response first time)
 #ggplot(data=tomorrow.sum, aes(x=agegroup, y=both.correct.m)) +
