@@ -169,8 +169,6 @@ subs <- d.all %>%
 subs_counts <- subs %>%
   group_by(agegroup, language) %>%
   summarize(n())
-  
-#Make sure these counts line up with what Katharine expects/has on record (e.g., only 4 usuable 7YO tested in English?)
 ```
 
 9. Calendar task only 
@@ -208,6 +206,17 @@ cal.g <- cal.d %>%
   filter(language == "german") %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
+cal.d %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+all <- ggplot(cal.d, aes(x = response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 30) +
+  facet_grid(language ~ item ~ agegroup)
+all
+  
 #Frequency distributions of first response only
 par(mfrow=c(1,1))
 E <- ggplot(cal.e, aes(x=response1)) +
@@ -239,17 +248,23 @@ summary(cal.lm)
 ```
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
+
+Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying time words on the first try. 
 ```{r}
 cal.lm = glmer(cor.first ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
 summary(cal.lm)
 ```
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
+
+Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
 d.lm = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
 summary(d.lm)
 ```
-Calendar Task: does language spoken or age (in years) predict successful placement of time words?
+Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
+
+Mixed-effects logistic regression examining the effects of language group, age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying identifying the deictic status of time words. 
 ```{r}
 d.lm = glmer(stat.correct ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
 summary(d.lm)
@@ -263,32 +278,36 @@ verbal <- d.all %>%
   summarize(correct.m <- mean(correct))
 
 ### plot correct first placements (Did they give correct response first time)
-ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=language, color=language)) +
+correctPlacements <- ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=language, color=language)) +
   geom_line(aes(color=language))+
   geom_point() +
   ylab('prop correct') +
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
 facet_wrap( ~ item, nrow=2) 
+
+ggsave(correctPlacements, file= "CorrectFirstPlacements.jpeg", width = 10, height = 10, dpi = 300)
 ```
 ```{r}
 ### plot correct status
-ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language)) +
+correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language)) +
   geom_line(aes(color=language))+
   geom_point() +
   ylab('prop correct') +
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
   facet_wrap( ~ item, nrow=2) 
+
+ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
 ```
 
-###Did children place both items in a pair in the correct location? (e.g., tomorrow/after tomorrow, yesterday/before yesterday, proximal terms, distal terms)
+###Did children place paired distal, proximal, past, and future items in the correct location? (e.g., correct placement for both tomorrow/after tomorrow)
 ```{r}
 #create new data frame
 cal.allT <- cal.d %>%
   select (subjid, agegroup, language, item, correct)
 #transpose item (i.e., transform from long to wide format)
-cal.allT <- reshape(cal.e, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
+cal.allT <- reshape(cal.allT, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
 
 #Code for tomorrow & yesterday both correct (proxCorr = 1)
 cal.allT <- cal.allT %>%
@@ -362,7 +381,7 @@ ggplot(cal.allTrecoded, aes(x=BothCorr)) +
 ggplot(data=cal.allTrecoded, aes(x = BothCorr)) +
   geom_bar() +
   geom_text(stat='count', aes(label = ..count..), vjust = -1) +
-  facet_wrap(~item, nrow = 4)
+  facet_wrap(language ~ item, nrow = 4)
 ###plot proportion of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow Qs, yesterday Qs.
 ##1 = both correct, 0 = one or more incorrect responses for paired stimuli (e.g., tomorrow & day after tomorrow)
 cal.allTrecoded[,'BothCorrF'] <- as.factor(cal.allTrecoded[,'BothCorr'])
@@ -370,11 +389,31 @@ Prop_Graph <- ggplot(cal.allTrecoded, aes(x=item, fill = BothCorrF)) +
   geom_bar(position = "fill") +
   coord_flip() +
   ylab('proportion of participants') +
-  facet_wrap(~agegroup)
+  facet_wrap(language ~ agegroup)
+
+
+cal.sumPairs <- cal.allTrecoded %>%
+#for each word, how many kids got them right on the first try
+   group_by(language, agegroup, item) %>%
+  summarize(bothcorrect.m = mean(BothCorr, na.rm=T),     # % who put item in right box on first try
+            sd.bothcorrect = sd(BothCorr, na.rm=T),
+            n = n(),
+            se.bothcorrect = sd.bothcorrect/sqrt(n))
+
+### plot if paired items both correct (correct response first time)
+CorrectPairs <- ggplot(data=cal.sumPairs, aes(x=agegroup, y=bothcorrect.m, group=language, color=language)) +
+  geom_line(aes(color=language))+
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1) +
+  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
+facet_wrap( ~ item, nrow=2) 
+
+ggsave(CorrectPairs, file= "PairedItems_PropCorrect.jpeg", width = 10, height = 10, dpi = 300)
+
 ```
 
 ### plot correct first placements (Did they give correct response first time)
-```{r}
 ggplot(data=cal.sum, aes(x=item, y=first.m)) +
   geom_line()+
   geom_point() +
@@ -384,9 +423,16 @@ ggplot(data=cal.sum, aes(x=item, y=first.m)) +
   facet_wrap( agegroup ~ language, nrow=3) 
 
 #What are errors based on? distance from today?
-first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
-            sd.correct = sd(cor.first, na.rm=T),
-            se.correct = sd.correct/sqrt(n),
-            deictic.m = mean(stat.correct), # average #participants who got correct status
+#first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
+            #sd.correct = sd(cor.first, na.rm=T),
+            #se.correct = sd.correct/sqrt(n),
+            #deictic.m = mean(stat.correct), # average #participants who got correct status
+```
+##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
+```{r}
+
 ```
 
+##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
+
+##Sum # of words correct (4 correct? 3 correct? etc.)
