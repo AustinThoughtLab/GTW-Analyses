@@ -243,7 +243,7 @@ ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
-cal.lm = glmer(cor.first ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
+cal.lm = glmer(cor.first ~ language*prox + ageyears*prox + (1|subjid), family='binomial', data=cal.d)
 summary(cal.lm)
 ```
 
@@ -252,11 +252,11 @@ Calendar Task: does item or age (in years) predict successful placement of time 
 Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [English participants only]
 ```{r}
 #English participants only
-cal.lm.e = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+cal.lm.e = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e)
 
-#german participants only
-cal.lm.g = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+#German participants only
+cal.lm.g = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
 summary(cal.lm.g)
 ```
 
@@ -272,11 +272,11 @@ Calendar Task: does language spoken or age (in years) predict successful placeme
 Mixed-effects logistic regression examining the effects of age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
 #English participants only
-d.lm.e = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+d.lm.e = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
 summary(d.lm.e)
 
 #German participants only
-d.lm.g = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+d.lm.g = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
 summary(d.lm.g)
 ```
 
@@ -474,43 +474,34 @@ English_daysofweek <- d.all %>%
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 
-Mixed-effects logistic regression examining the effects of age, and verbal Qs on children’s successful placement of time words in the correct squares on the first try
+#Mixed-effects logistic regression examining the effects of age, and verbal Qs on children’s successful placement of time words in the correct squares on the first try
 ```{r}
 #create new data frame (english only)
-vd.e <- d.all %>%
-  filter(language == 'english', task=="calendar" & itemtype %in% c("deictic", "verbal") & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
-  select(-linelength,-distfrommid) %>%
-  mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
+#vd.e <- d.all %>%
+  #filter(language == 'english', task=="calendar" & itemtype %in% c("deictic", "verbal") & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+  #select(-linelength,-distfrommid) %>%
+  #mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
          #response = as.numeric(response), #this is redundant 
-         cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
-         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))
+         #cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
+         #prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
+         #prox = as.factor(prox))
 
 #English participants only
-vd.lm.e = glmer(cor.first ~ itemtype + ageyears + (1|subjid), family='binomial', data=vd.e)
-summary(vd.lm.e)
+#vd.lm.e = glmer(correct ~ itemtype*ageyears + (1|subjid), family='binomial', data=vd.e)
+#summary(vd.lm.e)
 
 #create new data frame (german only)
-vd.g <- d.all %>%
-   filter(language == 'german', task=="calendar" & itemtype %in% c("deictic", "verbal") & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
-  select(-linelength,-distfrommid) %>%
-  mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
+#vd.g <- d.all %>%
+   #filter(language == 'german', task=="calendar" & itemtype %in% c("deictic", "verbal") & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+  #select(-linelength,-distfrommid) %>%
+  #mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
          #response = as.numeric(response), #this is redundant 
-         cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
-         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))
+         #cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
+         #prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
+         #prox = as.factor(prox))
 #German participants only
-vd.lm.g = glmer(cor.first ~ itemtype + ageyears + (1|subjid), family='binomial', data=vd.g)
-summary(vd.lm.g)
+#vd.lm.g = glmer(cor.first ~ itemtype + ageyears + (1|subjid), family='binomial', data=vd.g)
+#summary(vd.lm.g)
 ```
 
-Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [English participants only]
-```{r}
-#English participants only
-cal.lm.e = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
-summary(cal.lm.e)
-
-#german participants only
-cal.lm.g = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
-summary(cal.lm.g)
 ##Sum # of words correct (4 correct? 3 correct? etc.)
