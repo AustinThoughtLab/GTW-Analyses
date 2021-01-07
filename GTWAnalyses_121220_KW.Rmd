@@ -47,9 +47,9 @@ d.e <- d.e %>%
 d.e[d.e == "999"] <- NA 
 d.e[d.e == ""] <- NA
 
-#aggregate response1 and respnse 2 columns
-d.e <- d.e %>%
-mutate(response = ifelse(is.na(response2) == T, response1, response2))
+#aggregate response1 and response 2 columns
+#d.e <- d.e %>%
+#mutate(response = ifelse(is.na(response2) == T, response1, response2))
 ```
 
 4. Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)
@@ -91,7 +91,7 @@ d.all <- d.all %>%
                               task == "calendar" & itemtype == "deictic" & item == "aftertomorrow" ~ '6',
                               task == "calendar" & itemtype == "verbal" & item == "aftertoday" ~ '1',
                               task == "calendar" & itemtype == "verbal" & item == "beforetoday" ~ '2',
-                              task == "calendar" & itemtype == "verbal" & item == "daysofweek" ~ '1',
+                              task == "calendar" & itemtype == "verbal" & item == "daysofweek" ~ '7',
                               #assuming a 1 indicates that the child correctly identified all 7 days of the week
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "1" ~ "1",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "2" ~ "2",
@@ -131,7 +131,7 @@ d.all <- d.all %>%
                               task == "timeline" & linenum == "4" & item == "yesterday" ~ '2',
                               task == "timeline" & linenum == "4" & item == "tomorrow" ~ '3',
                               task == "timeline" & linenum == "4" & item == "aftertomorrow" ~ '4'))
-##seems to match correctr variable that already exists in the data file with two exceptions: 'weekdays' is coded as 1 = correctly named all 7 days and 0 = incorrectly named all 7 days; and verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
+##seems to match correctr variable that already exists in the data file with two exceptions: verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
 ```
 
 7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
@@ -247,12 +247,17 @@ cal.lm = glmer(cor.first ~ language*prox+ageyears*prox + (1|subjid), family='bin
 summary(cal.lm)
 ```
 
-Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
+Calendar Task: does item or age (in years) predict successful placement of time words in the correct squares on the first try?
 
-Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying time words on the first try. 
+Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [English participants only]
 ```{r}
-cal.lm = glmer(cor.first ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
-summary(cal.lm)
+#English participants only
+cal.lm.e = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+summary(cal.lm.e)
+
+#german participants only
+cal.lm.g = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+summary(cal.lm.g)
 ```
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
@@ -264,10 +269,15 @@ summary(d.lm)
 ```
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
 
-Mixed-effects logistic regression examining the effects of language group, age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying identifying the deictic status of time words. 
+Mixed-effects logistic regression examining the effects of age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
-d.lm = glmer(stat.correct ~ language*prox+ageyears*item + (1|subjid), family='binomial', data=cal.d)
-summary(d.lm)
+#English participants only
+d.lm.e = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+summary(d.lm.e)
+
+#German participants only
+d.lm.g = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+summary(d.lm.g)
 ```
 
 ```{r}
@@ -285,6 +295,7 @@ correctPlacements <- ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=langu
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
 facet_wrap( ~ item, nrow=2) 
+correctPlacements
 
 ggsave(correctPlacements, file= "CorrectFirstPlacements.jpeg", width = 10, height = 10, dpi = 300)
 ```
@@ -297,10 +308,16 @@ correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=languag
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
   facet_wrap( ~ item, nrow=2) 
+correctStatus
 
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
 ```
-
+#What are errors based on? distance from today?
+#first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
+            #sd.correct = sd(cor.first, na.rm=T),
+            #se.correct = sd.correct/sqrt(n),
+            #deictic.m = mean(stat.correct), # average #participants who got correct status
+            
 ###Did children place paired distal, proximal, past, and future items in the correct location? (e.g., correct placement for both tomorrow/after tomorrow)
 ```{r}
 #create new data frame
@@ -408,30 +425,52 @@ CorrectPairs <- ggplot(data=cal.sumPairs, aes(x=agegroup, y=bothcorrect.m, group
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
 facet_wrap( ~ item, nrow=2) 
+CorrectPairs
 
 ggsave(CorrectPairs, file= "PairedItems_PropCorrect.jpeg", width = 10, height = 10, dpi = 300)
 
 ```
 
-### plot correct first placements (Did they give correct response first time)
-ggplot(data=cal.sum, aes(x=item, y=first.m)) +
-  geom_line()+
-  geom_point() +
-  ylab('prop correct on first try') +
-  ylim(0,1) +
-  geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
-  facet_wrap( agegroup ~ language, nrow=3) 
-
-#What are errors based on? distance from today?
-#first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
-            #sd.correct = sd(cor.first, na.rm=T),
-            #se.correct = sd.correct/sqrt(n),
-            #deictic.m = mean(stat.correct), # average #participants who got correct status
-```
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
 ```{r}
+#create new data frame
+target <- c("verbal", "deictic")
+VerbalCal.d <- d.all %>%
+  filter(task=="calendar" & itemtype == target & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic and verbal items
+  select(-linelength,-distfrommid) %>%
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
+         prox = ifelse(itemtype == "deictic" & item %in% c('yesterday','tomorrow'),1, NA),#yesterday&tomorrow coded as proximal terms
+         distal = ifelse(itemtype == "deictic" & item %in% c('beforeyesterday', 'aftertomorrow'),0, NA),#beforeyesterday%aftertomorrow coded as distal terms
+         prox = as.factor(prox), 
+         distal = as.factor(distal))
 
+#create new data frame (verbal items only)
+VerbalT.d <- VerbalCal.d %>%
+  filter(itemtype == "verbal") %>%
+  select (subjid, agegroup, language, task, item, itemtype, correct, cor.first)
+  
+#transpose item (i.e., transform from long to wide format)
+VerbalT.d <- reshape(VerbalT.d, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
 ```
+#check percentage of particiopants (in each language group separately) that were able to correctly recite the days of the week
+```{r}
+daysofweek <- d.all %>%
+  select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
+  filter(item == "daysofweek")
+
+German_daysofweek <- d.all %>%
+  filter(language == "german", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+
+English_daysofweek <- d.all %>%
+  filter(language == "english", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+```
+
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 
