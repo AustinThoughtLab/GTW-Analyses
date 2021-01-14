@@ -14,6 +14,7 @@ library(ggplot2)
 library(reshape2)
 library(ggpubr)
 library(dplyr)
+library(car)
 ```
 
 2. Read in the German language data
@@ -22,14 +23,14 @@ library(dplyr)
 d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
-  mutate(language = 'german')
-
+  mutate(language = 'german',
+        linenum = ifelse(item=="lastyear", 3, linenum)) # there appears to be an error where this item was incorrectly attributed to line 4
 
 #replace missing data and empty cells with NA
 d.g[d.g == "999"] <- NA 
 d.g[d.g == ""] <- NA
 
-#aggregate response1 and response 2 columns
+#aggregate response1 and response2 columns
 d.g <- d.g %>%
 mutate(response = ifelse(is.na(response2) == T, response1, response2))
 ```
@@ -47,9 +48,10 @@ d.e <- d.e %>%
 d.e[d.e == "999"] <- NA 
 d.e[d.e == ""] <- NA
 
-#aggregate response1 and response 2 columns
-#d.e <- d.e %>%
-#mutate(response = ifelse(is.na(response2) == T, response1, response2))
+#aggregate response1 and response2 columns
+d.e <- d.e %>%
+mutate(response = ifelse(is.na(response2) == T, response1, response2))
+
 ```
 
 4. Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)
@@ -132,6 +134,11 @@ d.all <- d.all %>%
                               task == "timeline" & linenum == "4" & item == "tomorrow" ~ '3',
                               task == "timeline" & linenum == "4" & item == "aftertomorrow" ~ '4'))
 ##seems to match correctr variable that already exists in the data file with two exceptions: verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
+
+check <- d.all %>%
+  mutate(matchR = ifelse(correctr == correctR, 'YES', 'NO')) %>%
+  filter(matchR == 'NO')   ## 69 mismatches, mostly on verbal Q's, in other cases correctR seems to be correct
+
 ```
 
 7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
@@ -153,7 +160,7 @@ d.all <- d.all %>%
          resp.stat = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response > correctR ~ 1, 
-                               TRUE ~ 0), #"what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
+                               TRUE ~ 0), # "what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
          #create variable and code whether the items correct placement is in the future
          item.stat = ifelse(item %in% future.words, 1, 0),
          #create variable and code whether the participant correctly placed the item in the past vs. future
@@ -176,10 +183,8 @@ subs_counts <- subs %>%
 cal.d <- d.all %>%
   filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
   select(-linelength,-distfrommid) %>%
-  mutate(#response = ifelse(is.na(response2) == T, response1, response2), #this is redundant
-         #response = as.numeric(response), #this is redundant 
-         cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
-         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), #yesterday and tomorrow coded as proximal terms
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
 
@@ -243,8 +248,23 @@ ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
-cal.lm = glmer(cor.first ~ language*prox + ageyears*prox + (1|subjid), family='binomial', data=cal.d)
-summary(cal.lm)
+cal.lm1 <- glmer(cor.first ~ language*item*ageyears + (1|subjid), family = 'binomial', data=cal.d) #FTC
+summary(cal.lm1) 
+Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
+
+cal.lm2 <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) 
+summary(cal.lm2)
+Anova(cal.lm2, Type=3)
+
+
+cal.lm3 <-  glmer(cor.first ~ language*prox*ageyears + (1|subjid), family='binomial', data=cal.d) #FTC
+summary(cal.lm3)
+Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age wuth no interactions
+
+cal.lm4 <-  glmer(cor.first ~ language + prox + ageyears + (1|subjid), family='binomial', data=cal.d) 
+summary(cal.lm4)
+Anova(cal.lm4, Type=3)
+
 ```
 
 Calendar Task: does item or age (in years) predict successful placement of time words in the correct squares on the first try?
@@ -252,12 +272,24 @@ Calendar Task: does item or age (in years) predict successful placement of time 
 Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [English participants only]
 ```{r}
 #English participants only
-cal.lm.e = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
+cal.lm.e1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e)
+Anova(cal.lm.e, Type=3) #suggests main effects, no interaction
+
+cal.lm.e2 = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+summary(cal.lm.e2)
+Anova(cal.lm.e2, Type=3)
 
 #German participants only
-cal.lm.g = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
-summary(cal.lm.g)
+cal.lm.g1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
+summary(cal.lm.g1)
+Anova(cal.lm.g1, Type=3)
+
+cal.lm.g2 = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+summary(cal.lm.g2)
+Anova(cal.lm.g2, Type=3)
+
+
 ```
 
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
