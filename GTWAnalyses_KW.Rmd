@@ -245,7 +245,6 @@ histograms
 
 ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi = 300)
 ```
-
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
 cal.lm1 <- glmer(cor.first ~ language*item*ageyears + (1|subjid), family = 'binomial', data=cal.d) #FTC
@@ -259,7 +258,7 @@ Anova(cal.lm2, Type=3)
 
 cal.lm3 <-  glmer(cor.first ~ language*prox*ageyears + (1|subjid), family='binomial', data=cal.d) #FTC
 summary(cal.lm3)
-Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age wuth no interactions
+Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age with no interactions
 
 cal.lm4 <-  glmer(cor.first ~ language + prox + ageyears + (1|subjid), family='binomial', data=cal.d) 
 summary(cal.lm4)
@@ -292,24 +291,58 @@ Anova(cal.lm.g2, Type=3)
 
 ```
 
-Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
+Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future?
+```{r}
+d.lm1 <- glmer(stat.correct ~ language*item*ageyears + (1|subjid), family = 'binomial', data=cal.d) #FTC
+summary(d.lm1) 
+Anova(d.lm1, Type=3) # suggests there are effects of item but not ageyears or language (and with no interactions)
+
+d.lm2 <- glmer(stat.correct ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) 
+summary(d.lm2)
+Anova(d.lm2, Type=3) # suggests there are effects of item but not ageyears or language (and with no interactions)
+
+
+d.lm3 <-  glmer(stat.correct ~ language*prox*ageyears + (1|subjid), family='binomial', data=cal.d) #FTC
+summary(d.lm3)
+Anova(d.lm3, Type=3) # suggests there are no main effects of language, proximity, or age and no interactions
+
+d.lm4 <-  glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family='binomial', data=cal.d) 
+summary(d.lm4)
+Anova(d.lm4, Type=3)
+```
+
 
 Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
-d.lm = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d)
-summary(d.lm)
+d.lm5 = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d) #FTC
+summary(d.lm5)
+Anova(d.lm5, Type=3) #suggests no main effects of language, proximity, age in years, and no interactions
+
+d.lm6 = glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family = 'binomial', data=cal.d)
+summary(d.lm6)
+Anova(d.lm6, Type=3)
 ```
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
 
 Mixed-effects logistic regression examining the effects of age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
 #English participants only
-d.lm.e = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
-summary(d.lm.e)
+d.lm.e1 = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.e) #FTC
+summary(d.lm.e1) #suggests main effect of item but no interaction
+Anova(d.lm.e1, Type=3)
+
+d.lm.e2 = glmer(stat.correct ~ item + ageyears + (1|subjid), family = 'binomial', data=cal.e)
+summary(d.lm.e2)
+Anova(d.lm.e2, Type = 3)
 
 #German participants only
-d.lm.g = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
-summary(d.lm.g)
+d.lm.g1 = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.g) #FTC
+summary(d.lm.g1) # suggests main effect of item but no interaction
+Anova(d.lm.g1, Type = 3)
+
+d.lm.g2 = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+summary(d.lm.g2)
+Anova(d.lm.g2, Type = 3)
 ```
 
 ```{r}
@@ -328,8 +361,32 @@ correctPlacements <- ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=langu
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
 facet_wrap( ~ item, nrow=2) 
 correctPlacements
-
 ggsave(correctPlacements, file= "CorrectFirstPlacements.jpeg", width = 10, height = 10, dpi = 300)
+
+### plot correct first placements separately for each language group
+Englishcal_sum <- cal.sum %>%
+  filter(language == "english")
+Germancal_sum <- cal.sum %>%
+  filter(language == "german")
+
+EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agegroup, y = first.m, group = item, color = item)) +
+  geom_line(aes(color=item)) +
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1)
+EnglishPlacements
+
+GermanPlacements <- ggplot(data=Germancal_sum, aes(x=agegroup, y = first.m, group = item, color = item)) +
+  geom_line(aes(color=item)) +
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1)
+GermanPlacements
+
+CorrectFirstFigure <- ggarrange(EnglishPlacements, GermanPlacements,
+                    labels = c("English", "German"),
+                    ncol = 2, nrow = 1)
+CorrectFirstFigure
 ```
 ```{r}
 ### plot correct status
@@ -341,8 +398,27 @@ correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=languag
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
   facet_wrap( ~ item, nrow=2) 
 correctStatus
-
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
+
+### plot correct status by ietm (for each language separately)
+EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
+  geom_line(aes(color=item))+
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1)
+EnglishStatus
+
+GermanStatus <-ggplot(data=Germancal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
+  geom_line(aes(color=item))+
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0,1)
+GermanStatus
+
+CorrectStatusFigure <- ggarrange(EnglishStatus, GermanStatus,
+                    labels = c("English", "German"),
+                    ncol = 2, nrow = 1)
+CorrectStatusFigure
 ```
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
@@ -431,6 +507,7 @@ ggplot(data=cal.allTrecoded, aes(x = BothCorr)) +
   geom_bar() +
   geom_text(stat='count', aes(label = ..count..), vjust = -1) +
   facet_wrap(language ~ item, nrow = 4)
+
 ###plot proportion of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow Qs, yesterday Qs.
 ##1 = both correct, 0 = one or more incorrect responses for paired stimuli (e.g., tomorrow & day after tomorrow)
 cal.allTrecoded[,'BothCorrF'] <- as.factor(cal.allTrecoded[,'BothCorr'])
@@ -461,7 +538,70 @@ CorrectPairs
 
 ggsave(CorrectPairs, file= "PairedItems_PropCorrect.jpeg", width = 10, height = 10, dpi = 300)
 
+#plot if paired items both placed correctly on the first try (for each language separately)
+Englishcal.sumPairs <- cal.sumPairs %>%
+  filter(language == "english")
+
+Germancal.sumPairs <- cal.sumPairs %>%
+  filter(language == "german")
+
+CorrectPairsEnglish <- ggplot(data=Englishcal.sumPairs, aes(x = agegroup, y =bothcorrect.m, group=item, color=item)) +
+  geom_line(aes(color = item)) +
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0, 1)
+CorrectPairsEnglish
+
+CorrectPairsGerman <- ggplot(data=Germancal.sumPairs, aes(x = agegroup, y =bothcorrect.m, group=item, color=item)) +
+  geom_line(aes(color = item)) +
+  geom_point() +
+  ylab('prop correct') +
+  ylim(0, 1)
+
+CorrectPairsFigure <- ggarrange(CorrectPairsEnglish, CorrectPairsGerman,
+                    labels = c("English", "German"),
+                    ncol = 2, nrow = 1)
+CorrectPairsFigure
 ```
+```{r}
+# now let's compare performance between time words (within each language separately)
+
+ggboxplot(Englishcal_sum, x = "item", y = "first.m",
+          color = "item",
+          ylab = "% who put item in right box on first try", xlab = "items") +
+  ggtitle("English Speakers")
+
+ggboxplot(Germancal_sum, x = "item", y = "first.m",
+          color = "item",
+          ylab = "% who put item in right box on first try", xlab = "items") +
+  ggtitle("German Speakers")
+
+#compute summary statitistics by item: median and interquartile range
+
+Englishcal_sum %>%
+  group_by(item) %>%
+  get_summary_stats(first.m, type = "median_iqr")
+
+Germancal_sum %>%
+  group_by(item) %>%
+  get_summary_stats(first.m, type = "median_iqr")
+
+English.test <- cal.e %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+English.test
+
+German.test <- cal.g %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+German.test
+```
+
+
+
+
+
+
 
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
 ```{r}
