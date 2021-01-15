@@ -14,6 +14,7 @@ library(ggplot2)
 library(reshape2)
 library(ggpubr)
 library(dplyr)
+library(rstatix)
 library(car)
 ```
 
@@ -38,7 +39,7 @@ mutate(response = ifelse(is.na(response2) == T, response1, response2))
 3. Read in the English language data
 ```{r}
 #Note that 999 indicates missing data
-d.e <- read.csv('data_austin121119.csv')
+d.e <- read.csv('data_austin121119_kw.csv')
 d.e <- d.e %>%
   #remove unnecessary columns
   select(-ID,-dob, -dot, -agedays, -monolingual, -site, -comments, -covered) %>%
@@ -228,15 +229,17 @@ E <- ggplot(cal.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
   ggtitle("English Speakers") +
-  ylim(0, 30) +
+  ylim(0, 40) +
   facet_grid(item ~ agegroup)
+E
 
 G <- ggplot(cal.g, aes(x=response1)) +
   geom_histogram(position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
   ggtitle("German Speakers") +
-  ylim(0, 30) +
+  ylim(0, 40) +
   facet_grid(item ~ agegroup)
+G
 
 histograms <- ggarrange(E, G, 
           ncol = 1, nrow = 2)
@@ -272,8 +275,8 @@ Mixed-effects logistic regression examining the effects of age, and item on succ
 ```{r}
 #English participants only
 cal.lm.e1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
-summary(cal.lm.e)
-Anova(cal.lm.e, Type=3) #suggests main effects, no interaction
+summary(cal.lm.e1)
+Anova(cal.lm.e1, Type=3) #suggests main effects, no interaction
 
 cal.lm.e2 = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e2)
@@ -400,7 +403,7 @@ correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=languag
 correctStatus
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
 
-### plot correct status by ietm (for each language separately)
+### plot correct status by item (for each language separately)
 EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
@@ -419,6 +422,14 @@ CorrectStatusFigure <- ggarrange(EnglishStatus, GermanStatus,
                     labels = c("English", "German"),
                     ncol = 2, nrow = 1)
 CorrectStatusFigure
+
+## check on bizarre results: English speaking older kids are doing worse with yesterday and tomorrow than the younger ones
+Englishcal_sum%>%
+  group_by(item, agegroup) %>%
+  summarize(mean(deictic.m))
+cal.e %>%
+  group_by(item, agegroup) %>%
+  summarize(mean(stat.correct))
 ```
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
@@ -498,7 +509,7 @@ cal.allTrecoded <- cal.allTrecoded %>%
   #group_by(agegroup, BothCorr) %>%
   #summarise(Freq=n())
 
-###plot # of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow/after tomorrow Qs, yesterday/before yesterday Qs.
+###plot number of participants who answered pairs of questions correctly: distal Qs, proximal Qs, tomorrow/after tomorrow Qs, yesterday/before yesterday Qs.
 ggplot(cal.allTrecoded, aes(x=BothCorr)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 0.5) +
   xlab("1 = both correct") +
@@ -564,28 +575,20 @@ CorrectPairsFigure <- ggarrange(CorrectPairsEnglish, CorrectPairsGerman,
 CorrectPairsFigure
 ```
 ```{r}
-# now let's compare performance between time words (within each language separately)
-
+#compare performance between time words (within each language separately)
 ggboxplot(Englishcal_sum, x = "item", y = "first.m",
           color = "item",
-          ylab = "% who put item in right box on first try", xlab = "items") +
+          ylab = "% who put item in right box on first try", xlab = "items", 
+          ylim=c(0.2, 1.0)) +
   ggtitle("English Speakers")
 
 ggboxplot(Germancal_sum, x = "item", y = "first.m",
           color = "item",
-          ylab = "% who put item in right box on first try", xlab = "items") +
+          ylab = "% who put item in right box on first try", xlab = "items", 
+          ylim=c(0.2, 1.0)) +
   ggtitle("German Speakers")
 
-#compute summary statitistics by item: median and interquartile range
-
-Englishcal_sum %>%
-  group_by(item) %>%
-  get_summary_stats(first.m, type = "median_iqr")
-
-Germancal_sum %>%
-  group_by(item) %>%
-  get_summary_stats(first.m, type = "median_iqr")
-
+#wilcox_test for item level comparisons
 English.test <- cal.e %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
@@ -597,10 +600,43 @@ German.test <- cal.g %>%
 German.test
 ```
 
+```{r}
+#compare performance between time words by age group (within each language separately)
+English_boxplot <- ggboxplot(Englishcal_sum, x = "item", y = "first.m",
+          color = "item", 
+          ylab = "% who put item in right box on first try", xlab = "items",
+          ylim=c(0, 1.0),
+          facet.by = "agegroup",
+          nrow = 3,
+          ncol = 1) +
+  ggtitle("English Speakers")
+English_boxplot
+ggsave(English_boxplot, file= "EnglishBoxPlot.jpeg", width = 12, height = 10, dpi = 300)
 
+German_boxplot <- ggboxplot(Germancal_sum, x = "item", y = "first.m",
+          color = "item", 
+          ylab = "% who put item in right box on first try", xlab = "items",
+          ylim=c(0, 1.0),
+          facet.by = "agegroup",
+          nrow = 3,
+          ncol = 1) +
+  ggtitle("German Speakers")
+German_boxplot
+ggsave(German_boxplot, file= "GermanBoxPlot.jpeg", width = 12, height = 10, dpi = 300)
 
+#wilcox_test for item level comparisons
+English.test <- cal.e %>%
+  group_by(agegroup) %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+English.test
 
-
+German.test <- cal.g %>%
+  group_by(agegroup) %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+German.test
+```
 
 
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
