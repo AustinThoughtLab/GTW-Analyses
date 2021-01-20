@@ -39,10 +39,10 @@ mutate(response = ifelse(is.na(response2) == T, response1, response2))
 3. Read in the English language data
 ```{r}
 #Note that 999 indicates missing data
-d.e <- read.csv('data_austin121119_kw.csv')
+d.e <- read.csv('data_austin.csv')
 d.e <- d.e %>%
   #remove unnecessary columns
-  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -comments, -covered) %>%
+  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -covered, -comments, -experimenter) %>%
   mutate(language = 'english')
 
 #replace missing data and empty cells with NA
@@ -103,7 +103,7 @@ d.all <- d.all %>%
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "5" ~ "5",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "6" ~ "6",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "7" ~ "7",
-                              #remember that weekday values range from 1-7 and correspond to days of the week (e.g.,                               Monday = 1, Tuesday = 2, etc.)
+                              #remember that weekday values range from 1-7 and correspond to days of the week (e.g.,                               Sunday = 1, Monday = 2, etc.)
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "1" ~ '7',
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "2" ~ '1',
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "3" ~ '2',
