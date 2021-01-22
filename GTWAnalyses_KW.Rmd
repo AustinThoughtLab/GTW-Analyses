@@ -16,6 +16,7 @@ library(ggpubr)
 library(dplyr)
 library(rstatix)
 library(car)
+library(coin)
 ```
 
 2. Read in the German language data
@@ -138,8 +139,7 @@ d.all <- d.all %>%
 
 check <- d.all %>%
   mutate(matchR = ifelse(correctr == correctR, 'YES', 'NO')) %>%
-  filter(matchR == 'NO')   ## 69 mismatches, mostly on verbal Q's, in other cases correctR seems to be correct
-
+  filter(matchR == 'NO')   ## 74 mismatches, mostly on verbal Q's, in other cases correctR seems to be correct
 ```
 
 7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
@@ -234,10 +234,11 @@ E <- ggplot(cal.e, aes(x=response1)) +
 E
 
 G <- ggplot(cal.g, aes(x=response1)) +
-  geom_histogram(position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  geom_histogram(fille="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
   ggtitle("German Speakers") +
   ylim(0, 40) +
+  theme_classic() +
   facet_grid(item ~ agegroup)
 G
 
@@ -269,10 +270,16 @@ Anova(cal.lm4, Type=3)
 
 ```
 
-Calendar Task: does item or age (in years) predict successful placement of time words in the correct squares on the first try?
-
-Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [English participants only]
+Calendar Task: does langauge, item or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
+cal.lm.both <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d)
+summary(cal.lm.both)
+Anova(cal.lm.both, Type=3)
+```
+
+Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [for each language group separately]
+```{r}
+
 #English participants only
 cal.lm.e1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e1)
@@ -317,13 +324,14 @@ Anova(d.lm4, Type=3)
 
 Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying the deictic status of time words. 
 ```{r}
-d.lm5 = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d) #FTC
-summary(d.lm5)
-Anova(d.lm5, Type=3) #suggests no main effects of language, proximity, age in years, and no interactions
+#These models are redundant (see above)
+#d.lm5 = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d) #FTC
+#summary(d.lm5)
+#Anova(d.lm5, Type=3) #suggests no main effects of language, proximity, age in years, and no interactions
 
-d.lm6 = glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family = 'binomial', data=cal.d)
-summary(d.lm6)
-Anova(d.lm6, Type=3)
+#d.lm6 = glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family = 'binomial', data=cal.d)
+#summary(d.lm6)
+#Anova(d.lm6, Type=3)
 ```
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
 
@@ -366,37 +374,71 @@ facet_wrap( ~ item, nrow=2)
 correctPlacements
 ggsave(correctPlacements, file= "CorrectFirstPlacements.jpeg", width = 10, height = 10, dpi = 300)
 
+#recode agegroup
+cal.sum$agebin[cal.sum$agegroup == '4'] <- "Age 4"
+cal.sum$agebin[cal.sum$agegroup == '5'] <- "Age 5"
+cal.sum$agebin[cal.sum$agegroup == '6'] <- "Age 6"
+
+#recode language spoken
+cal.sum$languagegroup[cal.sum$language == 'english'] <- "English Speakers"
+cal.sum$languagegroup[cal.sum$language == 'german'] <- "German Speakers"
+
 ### plot correct first placements separately for each language group
 Englishcal_sum <- cal.sum %>%
   filter(language == "english")
 Germancal_sum <- cal.sum %>%
   filter(language == "german")
 
-EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agegroup, y = first.m, group = item, color = item)) +
+EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agebin, y = first.m, group = item, color = item)) +
   geom_line(aes(color=item)) +
   geom_point() +
-  ylab('prop correct') +
-  ylim(0,1)
+  ylab('Proportion Correct') +
+  xlab('English Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "bottom") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 EnglishPlacements
 
-GermanPlacements <- ggplot(data=Germancal_sum, aes(x=agegroup, y = first.m, group = item, color = item)) +
+GermanPlacements <- ggplot(data=Germancal_sum, aes(x=agebin, y = first.m, group = item, color = item)) +
   geom_line(aes(color=item)) +
   geom_point() +
-  ylab('prop correct') +
-  ylim(0,1)
+  ylab('Proportion Correct') +
+  xlab('German Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 GermanPlacements
 
 CorrectFirstFigure <- ggarrange(EnglishPlacements, GermanPlacements,
-                    labels = c("English", "German"),
-                    ncol = 2, nrow = 1)
+                    ncol = 2, nrow = 1, common.legend = TRUE, legend = "top")
 CorrectFirstFigure
+
+ggsave(CorrectFirstFigure, file= "BoxPlacementByItem2.jpeg",  width = 10, height = 10, dpi = 300)
 ```
 ```{r}
 ### plot correct status
 correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language)) +
   geom_line(aes(color=language))+
   geom_point() +
-  ylab('prop correct') +
+  ylab('Proportion Correct') +
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
   facet_wrap( ~ item, nrow=2) 
@@ -407,23 +449,24 @@ ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi =
 EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
-  ylab('prop correct') +
+  ylab('Proportion Correct') +
+  xlab('English Speakers') +
   ylim(0,1)
 EnglishStatus
 
 GermanStatus <-ggplot(data=Germancal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
-  ylab('prop correct') +
+  ylab('Proportion Correct') +
+  xlab ('German Speakers') +
   ylim(0,1)
 GermanStatus
 
 CorrectStatusFigure <- ggarrange(EnglishStatus, GermanStatus,
-                    labels = c("English", "German"),
                     ncol = 2, nrow = 1)
 CorrectStatusFigure
 
-## check on bizarre results: English speaking older kids are doing worse with yesterday and tomorrow than the younger ones
+## check on bizarre results: English speaking older kids are doing worse with yesterday and tomorrow than the younger ones (not a problem anymore since we corrected the data files, yay!)
 Englishcal_sum%>%
   group_by(item, agegroup) %>%
   summarize(mean(deictic.m))
@@ -593,11 +636,17 @@ English.test <- cal.e %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
 English.test
+#calculate effect size
+English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
+English.test.effsize
 
 German.test <- cal.g %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
 German.test
+#calculate effect size
+German.test.effsize <- cal.g %>% wilcox.effsize(cor.first ~item)
+German.test.effsize
 ```
 
 ```{r}
