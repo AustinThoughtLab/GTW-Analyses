@@ -163,9 +163,14 @@ d.all <- d.all %>%
                                  task=='verbal' & item == 'today' & response > correctR ~ 1, 
                                TRUE ~ 0), # "what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
          #create variable and code whether the items correct placement is in the future
+         resp.stat.1 = case_when(task=='timeline' & distfrommid > 0 ~ 1,
+                                 task=='calendar' & response1 > 4 ~ 1,
+                                 task=='verbal' & item == 'today' & response1 > correctR ~ 1, 
+                               TRUE ~ 0), # codes deictic status of the *first* sticker placement
          item.stat = ifelse(item %in% future.words, 1, 0),
          #create variable and code whether the participant correctly placed the item in the past vs. future
-         stat.correct = ifelse(item.stat == resp.stat, 1, 0))
+         stat.correct = ifelse(item.stat == resp.stat, 1, 0),
+         stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0)) #codes whether deictic status of first sticker placement was correct
 ```
 
 8. Participant counts
