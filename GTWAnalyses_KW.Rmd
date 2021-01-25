@@ -201,6 +201,7 @@ cal.sum <- cal.d %>%
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
             se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), #for got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
             rank.m = mean(correct))  # right box (final answer)
 ```
@@ -256,20 +257,20 @@ ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi
 ```
 Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
-cal.lm1 <- glmer(cor.first ~ language*item*ageyears + (1|subjid), family = 'binomial', data=cal.d) #FTC
+cal.lm1 <- glmer(cor.first ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
 summary(cal.lm1) 
 Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
 
-cal.lm2 <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) 
+cal.lm2 <- glmer(cor.first ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
 summary(cal.lm2)
 Anova(cal.lm2, Type=3)
 
 
-cal.lm3 <-  glmer(cor.first ~ language*prox*ageyears + (1|subjid), family='binomial', data=cal.d) #FTC
+cal.lm3 <-  glmer(cor.first ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
 summary(cal.lm3)
 Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age with no interactions
 
-cal.lm4 <-  glmer(cor.first ~ language + prox + ageyears + (1|subjid), family='binomial', data=cal.d) 
+cal.lm4 <-  glmer(cor.first ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
 summary(cal.lm4)
 Anova(cal.lm4, Type=3)
 
@@ -277,7 +278,7 @@ Anova(cal.lm4, Type=3)
 
 Calendar Task: does langauge, item or age (in years) predict successful placement of time words in the correct squares on the first try?
 ```{r}
-cal.lm.both <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d)
+cal.lm.both <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) # repeat of cal.lm2?
 summary(cal.lm.both)
 Anova(cal.lm.both, Type=3)
 ```
@@ -286,20 +287,20 @@ Mixed-effects logistic regression examining the effects of age, and item on succ
 ```{r}
 
 #English participants only
-cal.lm.e1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.e)
+cal.lm.e1 = glmer(cor.first ~ item*scale(ageyears) + (1 + item|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e1)
 Anova(cal.lm.e1, Type=3) #suggests main effects, no interaction
 
-cal.lm.e2 = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.e)
+cal.lm.e2 = glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e2)
 Anova(cal.lm.e2, Type=3)
 
 #German participants only
-cal.lm.g1 = glmer(cor.first ~ item*ageyears + (1|subjid), family='binomial', data=cal.g)
+cal.lm.g1 = glmer(cor.first ~ item*scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
 summary(cal.lm.g1)
 Anova(cal.lm.g1, Type=3)
 
-cal.lm.g2 = glmer(cor.first ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
+cal.lm.g2 = glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
 summary(cal.lm.g2)
 Anova(cal.lm.g2, Type=3)
 
@@ -308,20 +309,20 @@ Anova(cal.lm.g2, Type=3)
 
 Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future?
 ```{r}
-d.lm1 <- glmer(stat.correct ~ language*item*ageyears + (1|subjid), family = 'binomial', data=cal.d) #FTC
+d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
 summary(d.lm1) 
-Anova(d.lm1, Type=3) # suggests there are effects of item but not ageyears or language (and with no interactions)
+Anova(d.lm1, Type=3) # 
 
-d.lm2 <- glmer(stat.correct ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) 
+d.lm2 <- glmer(stat.correct.1 ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
 summary(d.lm2)
-Anova(d.lm2, Type=3) # suggests there are effects of item but not ageyears or language (and with no interactions)
+Anova(d.lm2, Type=3) # 
 
 
-d.lm3 <-  glmer(stat.correct ~ language*prox*ageyears + (1|subjid), family='binomial', data=cal.d) #FTC
+d.lm3 <-  glmer(stat.correct.1 ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
 summary(d.lm3)
 Anova(d.lm3, Type=3) # suggests there are no main effects of language, proximity, or age and no interactions
 
-d.lm4 <-  glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family='binomial', data=cal.d) 
+d.lm4 <-  glmer(stat.correct.1 ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
 summary(d.lm4)
 Anova(d.lm4, Type=3)
 ```
