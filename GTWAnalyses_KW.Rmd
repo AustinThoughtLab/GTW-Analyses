@@ -184,15 +184,25 @@ subs_counts <- subs %>%
   summarize(n())
 ```
 
-9. Calendar task only 
+9. Calendar task only
 ```{r}
 cal.d <- d.all %>%
-  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+#filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+  filter(task=="calendar" & itemtype=="deictic") %>%
+ #filter(agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
   select(-linelength,-distfrommid) %>%
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
+#remove 3- and 7-year-olds
+cal.d2 <- d.all %>%
+#filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
+  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
+  select(-linelength,-distfrommid) %>%
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
 
 cal.sum <- cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
@@ -204,11 +214,7 @@ cal.sum <- cal.d %>%
             deictic1.m = mean(stat.correct.1), #for got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
             rank.m = mean(correct))  # right box (final answer)
-```
 
-
-Calendar task only: Frequency distribution of box placement for each time word
-```{r}
 #filter by language
 cal.e <- cal.d %>%
   filter(language == "english") %>%
@@ -216,6 +222,19 @@ cal.e <- cal.d %>%
 
 cal.g <- cal.d %>%
   filter(language == "german") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+```
+
+
+Calendar task only: Frequency distribution of box placement for each time word
+```{r}
+#filter by language
+calhist.e <- cal.d %>%
+  filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+calhist.g <- cal.d %>%
+  filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 cal.d %>%
@@ -231,7 +250,7 @@ all
   
 #Frequency distributions of first response only
 par(mfrow=c(1,1))
-E <- ggplot(cal.e, aes(x=response1)) +
+E <- ggplot(calhist.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
   ggtitle("English Speakers") +
@@ -239,7 +258,7 @@ E <- ggplot(cal.e, aes(x=response1)) +
   facet_grid(item ~ agegroup)
 E
 
-G <- ggplot(cal.g, aes(x=response1)) +
+G <- ggplot(calhist.g, aes(x=response1)) +
   geom_histogram(fille="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
   ggtitle("German Speakers") +
@@ -255,112 +274,152 @@ histograms
 
 ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi = 300)
 ```
-Calendar Task: does language spoken or age (in years) predict successful placement of time words in the correct squares on the first try?
+Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
+```{r}
+d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
+summary(d.lm1) 
+Anova(d.lm1, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
+```
+
+Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term removed from the model]
+```{r}
+d.lm2 <- glmer(stat.correct.1 ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
+summary(d.lm2)
+Anova(d.lm2, Type=3) #main effect of age
+```
+
+Does age or item predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
+```{r}
+d.lm.2e <-  glmer(stat.correct.1 ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.e) 
+summary(d.lm.2e)
+Anova(d.lm.2e, Type=3) #main effect of age
+
+d.lm.2g <-  glmer(stat.correct.1 ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.g) 
+summary(d.lm.2g)
+Anova(d.lm.2g, Type=3) #main effect of age
+```
+
+Knowledge of deictic status on Calendar task: does language group, age, and temporal location (proximal vs. distal) predict successful placement of time words in the past or the future? [interaction term included in the model]
+```{r}
+d.lm3 <-  glmer(stat.correct.1 ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
+summary(d.lm3)
+Anova(d.lm3, Type=3) # suggests there are no main effects of language, proximity, or age and no interactions
+```
+
+Knowledge of deictic status on Calendar task: does language group, age, and temporal location (proximal vs. distal) predict successful placement of time words in the past or the future? [interaction term removed from the model]
+```{r}
+d.lm4 <-  glmer(stat.correct.1 ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
+summary(d.lm4)
+Anova(d.lm4, Type=3) #main effect of age
+```
+
+Knowledge of deictic status on calendar task: Does age or temporal location (proximal vs. distal) predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
+```{r}
+d.lm.4e <-  glmer(stat.correct.1 ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.e) 
+summary(d.lm.4e)
+Anova(d.lm.4e, Type=3) #main effect of age
+
+d.lm.4g <-  glmer(stat.correct.1 ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.g) 
+summary(d.lm.4g)
+Anova(d.lm.4g, Type=3) #main effect of age
+```
+
+Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
 ```{r}
 cal.lm1 <- glmer(cor.first ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
 summary(cal.lm1) 
 Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
+```
 
+Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term removed from the model]
+```{r}
 cal.lm2 <- glmer(cor.first ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
 summary(cal.lm2)
 Anova(cal.lm2, Type=3)
+```
+
+Does age or item predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
+
+```{r}
+cal.lm.2e <- glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.e) 
+summary(cal.lm.2e)
+Anova(cal.lm.2e, Type=3)
+
+cal.lm.2g <- glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.g) 
+summary(cal.lm.2g)
+Anova(cal.lm.2g, Type=3)
+```
 
 
+Wilcox_test for item level comparisons (cor.first) within each language group separately
+```{r}
+English.test <- cal.e %>%
+  group_by(agegroup) %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+English.test
+
+German.test <- cal.g %>%
+  group_by(agegroup) %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+German.test
+
+English.test <- cal.e %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+English.test
+#calculate effect size
+English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
+English.test.effsize
+
+German.test <- cal.g %>%
+  wilcox_test(cor.first ~ item) %>%
+  add_significance()
+German.test
+#calculate effect size
+German.test.effsize <- cal.g %>% wilcox.effsize(cor.first ~item)
+German.test.effsize
+
+?wilcox.test
+```
+
+Calendar Task: does language spoken, temporal location (proximal vs. distal),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+```{r}
 cal.lm3 <-  glmer(cor.first ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
 summary(cal.lm3)
 Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age with no interactions
+```
 
+Calendar Task: does language spoken, temporal location (proximal vs. distal),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term removed from the model]
+```{r}
 cal.lm4 <-  glmer(cor.first ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
 summary(cal.lm4)
 Anova(cal.lm4, Type=3)
-
 ```
 
-Calendar Task: does langauge, item or age (in years) predict successful placement of time words in the correct squares on the first try?
+Mixed-effects logistic regression examining the effects of age, and temporal distance on successful placement of time words in the correct squares on the first try [in English only]
 ```{r}
-cal.lm.both <- glmer(cor.first ~ language + item + ageyears + (1|subjid), family = 'binomial', data=cal.d) # repeat of cal.lm2?
-summary(cal.lm.both)
-Anova(cal.lm.both, Type=3)
-```
-
-Mixed-effects logistic regression examining the effects of age, and item on successful placement of time words in the correct squares on the first try [for each language group separately]
-```{r}
-
-#English participants only
-cal.lm.e1 = glmer(cor.first ~ item*scale(ageyears) + (1 + item|subjid), family='binomial', data=cal.e)
+cal.lm.e1 = glmer(cor.first ~ prox*scale(ageyears) + (1 + item|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e1)
 Anova(cal.lm.e1, Type=3) #suggests main effects, no interaction
 
-cal.lm.e2 = glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family='binomial', data=cal.e)
+cal.lm.e2 = glmer(cor.first ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.e)
 summary(cal.lm.e2)
 Anova(cal.lm.e2, Type=3)
+```
 
-#German participants only
-cal.lm.g1 = glmer(cor.first ~ item*scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
+Mixed-effects logistic regression examining the effects of age, and temporal distance on successful placement of time words in the correct squares on the first try [in German only]
+```{r}
+cal.lm.g1 = glmer(cor.first ~ prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
 summary(cal.lm.g1)
 Anova(cal.lm.g1, Type=3)
 
-cal.lm.g2 = glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
+cal.lm.g2 = glmer(cor.first ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
 summary(cal.lm.g2)
 Anova(cal.lm.g2, Type=3)
-
-
 ```
 
-Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future?
-```{r}
-d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
-summary(d.lm1) 
-Anova(d.lm1, Type=3) # 
-
-d.lm2 <- glmer(stat.correct.1 ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
-summary(d.lm2)
-Anova(d.lm2, Type=3) # 
-
-
-d.lm3 <-  glmer(stat.correct.1 ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
-summary(d.lm3)
-Anova(d.lm3, Type=3) # suggests there are no main effects of language, proximity, or age and no interactions
-
-d.lm4 <-  glmer(stat.correct.1 ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
-summary(d.lm4)
-Anova(d.lm4, Type=3)
-```
-
-
-Mixed-effects logistic regression examining the effects of language group, age, and temporal location (proximal vs. distal) on children’s likelihood of correctly identifying the deictic status of time words. 
-```{r}
-#These models are redundant (see above)
-#d.lm5 = glmer(stat.correct ~ language*prox+ageyears*prox + (1|subjid), family='binomial', data=cal.d) #FTC
-#summary(d.lm5)
-#Anova(d.lm5, Type=3) #suggests no main effects of language, proximity, age in years, and no interactions
-
-#d.lm6 = glmer(stat.correct ~ language + prox + ageyears + (1|subjid), family = 'binomial', data=cal.d)
-#summary(d.lm6)
-#Anova(d.lm6, Type=3)
-```
-Calendar Task: does language spoken or age (in years) predict successful placement of time words in the past or the future?
-
-Mixed-effects logistic regression examining the effects of age, and item ('day before yesterday', 'yesterday', 'tomorrow', 'day after tomorrow') on children’s likelihood of correctly identifying the deictic status of time words. 
-```{r}
-#English participants only
-d.lm.e1 = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.e) #FTC
-summary(d.lm.e1) #suggests main effect of item but no interaction
-Anova(d.lm.e1, Type=3)
-
-d.lm.e2 = glmer(stat.correct ~ item + ageyears + (1|subjid), family = 'binomial', data=cal.e)
-summary(d.lm.e2)
-Anova(d.lm.e2, Type = 3)
-
-#German participants only
-d.lm.g1 = glmer(stat.correct ~ item*ageyears + (1|subjid), family='binomial', data=cal.g) #FTC
-summary(d.lm.g1) # suggests main effect of item but no interaction
-Anova(d.lm.g1, Type = 3)
-
-d.lm.g2 = glmer(stat.correct ~ item + ageyears + (1|subjid), family='binomial', data=cal.g)
-summary(d.lm.g2)
-Anova(d.lm.g2, Type = 3)
-```
 
 ```{r}
 #-language:prox:ageyears 
@@ -623,6 +682,7 @@ CorrectPairsFigure <- ggarrange(CorrectPairsEnglish, CorrectPairsGerman,
                     ncol = 2, nrow = 1)
 CorrectPairsFigure
 ```
+
 ```{r}
 #compare performance between time words (within each language separately)
 ggboxplot(Englishcal_sum, x = "item", y = "first.m",
@@ -636,23 +696,6 @@ ggboxplot(Germancal_sum, x = "item", y = "first.m",
           ylab = "% who put item in right box on first try", xlab = "items", 
           ylim=c(0.2, 1.0)) +
   ggtitle("German Speakers")
-
-#wilcox_test for item level comparisons
-English.test <- cal.e %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-English.test
-#calculate effect size
-English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
-English.test.effsize
-
-German.test <- cal.g %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-German.test
-#calculate effect size
-German.test.effsize <- cal.g %>% wilcox.effsize(cor.first ~item)
-German.test.effsize
 ```
 
 ```{r}
@@ -678,19 +721,6 @@ German_boxplot <- ggboxplot(Germancal_sum, x = "item", y = "first.m",
   ggtitle("German Speakers")
 German_boxplot
 ggsave(German_boxplot, file= "GermanBoxPlot.jpeg", width = 12, height = 10, dpi = 300)
-
-#wilcox_test for item level comparisons
-English.test <- cal.e %>%
-  group_by(agegroup) %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-English.test
-
-German.test <- cal.g %>%
-  group_by(agegroup) %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-German.test
 ```
 
 
