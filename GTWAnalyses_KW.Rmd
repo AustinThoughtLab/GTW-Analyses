@@ -53,7 +53,6 @@ d.e[d.e == ""] <- NA
 #aggregate response1 and response2 columns
 d.e <- d.e %>%
 mutate(response = ifelse(is.na(response2) == T, response1, response2))
-
 ```
 
 4. Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)
@@ -204,7 +203,8 @@ cal.d2 <- d.all %>%
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
-cal.sum <- cal.d %>%
+#exclude 3- and 7-year-olds from cal.sum
+cal.sum <- cal.d2 %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
    group_by(language, agegroup, item) %>%
   summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
@@ -213,7 +213,8 @@ cal.sum <- cal.d %>%
             se.correct = sd.correct/sqrt(n),
             deictic1.m = mean(stat.correct.1), #for got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
-            rank.m = mean(correct))  # right box (final answer)
+            rank.m = mean(correct), # right box (final answer)
+            countCor.first = sum(cor.first))  #sum proportion correct for making bar graph instead of histogram
 
 #filter by language
 cal.e <- cal.d %>%
@@ -223,6 +224,9 @@ cal.e <- cal.d %>%
 cal.g <- cal.d %>%
   filter(language == "german") %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+cal.d %>%
+  mutate(item = factor(item, levels = ("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 ```
 
 
@@ -237,9 +241,6 @@ calhist.g <- cal.d %>%
   filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-cal.d %>%
-  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
-
 all <- ggplot(cal.d, aes(x = response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("box placement") +
@@ -247,33 +248,112 @@ all <- ggplot(cal.d, aes(x = response1)) +
   ylim(0, 30) +
   facet_grid(language ~ item ~ agegroup)
 all
+
+calhist.e$agebin[calhist.e$agegroup == '4'] <- "Age 4"
+calhist.e$agebin[calhist.e$agegroup == '5'] <- "Age 5"
+calhist.e$agebin[calhist.e$agegroup == '6'] <- "Age 6"
+calhist.g$agebin[calhist.g$agegroup == '4'] <- "Age 4"
+calhist.g$agebin[calhist.g$agegroup == '5'] <- "Age 5"
+calhist.g$agebin[calhist.g$agegroup == '6'] <- "Age 6"
   
 #Frequency distributions of first response only
 par(mfrow=c(1,1))
 E <- ggplot(calhist.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement") +
+  xlab("square placement") +
   ggtitle("English Speakers") +
   ylim(0, 40) +
-  facet_grid(item ~ agegroup)
+  theme_classic() +
+  facet_grid(item ~ agebin)
 E
 
 G <- ggplot(calhist.g, aes(x=response1)) +
   geom_histogram(fille="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
-  xlab("box placement") +
+  xlab("square placement") +
   ggtitle("German Speakers") +
   ylim(0, 40) +
   theme_classic() +
-  facet_grid(item ~ agegroup)
+  facet_grid(item ~ agebin)
 G
 
 histograms <- ggarrange(E, G, 
-          ncol = 1, nrow = 2)
+          ncol = 2, nrow = 1)
 
 histograms
 
-ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 12, dpi = 300)
+ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi = 300)
 ```
+
+```{r}
+#calhist.e <- calhist.e %>%
+  #mutate(CorrectSquare = case_when(item == "tomorrow"~ "5",
+                          #item == "yesterday"~ "3",
+                          #item == "aftertomorrow"~ "6",
+                          #item == "beforeyesterday"~ "2"))
+#I was going to try to use CorrectSquare to color an individual bar within each faceted graph. Haven't figured out if this will work yet. 
+
+English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1))) +
+  geom_bar() +
+  #scale_fill_manual(values = c()) +
+  theme_minimal(base_size = 14) +
+  facet_grid(item~agebin) +
+  xlab("Square Placement") +
+  ylab("Participant Count") +
+  ylim(0, 50) +
+  ggtitle("English Speakers") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black")) +
+  #customize facet labels
+  theme(
+      strip.text.x = element_text(
+        size = 14, color = "black", family = "Times"),
+      strip.text.y = element_text(
+        size = 14, color = "black", family = "Times")
+      )
+
+English_SquarePlacements
+
+German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1))) +
+  geom_bar() +
+  #scale_fill_manual(values = c()) +
+  theme_minimal(base_size = 14) +
+  facet_grid(item~agebin) +
+  xlab("Square Placement") +
+  ylab("Participant Count") +
+  ylim(0, 50) +
+  ggtitle("German Speakers") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black")) +
+  #customize facet labels
+  theme(
+      strip.text.x = element_text(
+        size = 14, color = "black", family = "Times"),
+      strip.text.y = element_text(
+        size = 14, color = "black", family = "Times")
+      )
+
+German_SquarePlacements
+
+Figure2 <- ggarrange(English_SquarePlacements, German_SquarePlacements, 
+          ncol = 2, nrow = 1)
+
+ggsave(Figure2, file= "Figure2.jpeg", width = 10, height = 8, dpi = 300)
+```
+
 Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
 ```{r}
 d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
@@ -350,22 +430,38 @@ summary(cal.lm.2g)
 Anova(cal.lm.2g, Type=3)
 ```
 
-
 Wilcox_test for item level comparisons (cor.first) within each language group separately
 ```{r}
-English.test <- cal.e %>%
-  group_by(agegroup) %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
+#filter by language & remove 3 and 7-year-olds
+cal.e2 <- cal.d %>%
+  filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+  droplevels() %>%
+  select(agegroup,language, item, cor.first) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+cal.e2$age <- as.character(cal.e2$agegroup)
+
+cal.g2 <- cal.d %>%
+  filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+  droplevels() %>%
+  select(agegroup,language, item, cor.first) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+cal.g2$age <- as.character(cal.g2$agegroup)
+
+#Wilcox_test for item level comparisons
+English.test <- cal.e2 %>%
+  group_by(age) %>%
+  pairwise.wilcox.test(cal.e2$cor.first, cal.e2$item, p.adjust.method = "BH")
 English.test
 
-German.test <- cal.g %>%
+German.test <- cal.g2 %>%
   group_by(agegroup) %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
 German.test
 
-English.test <- cal.e %>%
+English.test <- cal.e2 %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
 English.test
@@ -373,7 +469,7 @@ English.test
 English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
 English.test.effsize
 
-German.test <- cal.g %>%
+German.test <- cal.g2 %>%
   wilcox_test(cor.first ~ item) %>%
   add_significance()
 German.test
@@ -419,7 +515,6 @@ cal.lm.g2 = glmer(cor.first ~ prox + scale(ageyears) + (1|subjid), family='binom
 summary(cal.lm.g2)
 Anova(cal.lm.g2, Type=3)
 ```
-
 
 ```{r}
 #-language:prox:ageyears 
@@ -498,9 +593,11 @@ CorrectFirstFigure
 
 ggsave(CorrectFirstFigure, file= "BoxPlacementByItem2.jpeg",  width = 10, height = 10, dpi = 300)
 ```
+
+
 ```{r}
 ### plot correct status
-correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic.m, group=language, color=language)) +
+correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic1.m, group=language, color=language)) +
   geom_line(aes(color=language))+
   geom_point() +
   ylab('Proportion Correct') +
@@ -511,25 +608,49 @@ correctStatus
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
 
 ### plot correct status by item (for each language separately)
-EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
+EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agebin, y=deictic1.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
   ylab('Proportion Correct') +
   xlab('English Speakers') +
-  ylim(0,1)
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 EnglishStatus
 
-GermanStatus <-ggplot(data=Germancal_sum, aes(x=agegroup, y=deictic.m, group=item, color=item)) +
+GermanStatus <-ggplot(data=Germancal_sum, aes(x=agebin, y=deictic1.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
   ylab('Proportion Correct') +
   xlab ('German Speakers') +
-  ylim(0,1)
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 GermanStatus
 
 CorrectStatusFigure <- ggarrange(EnglishStatus, GermanStatus,
-                    ncol = 2, nrow = 1)
+                    ncol = 2, nrow = 1, common.legend = TRUE, legend = "top")
 CorrectStatusFigure
+
+ggsave(CorrectStatusFigure, file="correctStatusFigure.jpeg", width = 10, height = 5, dpi = 300)
 
 ## check on bizarre results: English speaking older kids are doing worse with yesterday and tomorrow than the younger ones (not a problem anymore since we corrected the data files, yay!)
 Englishcal_sum%>%
