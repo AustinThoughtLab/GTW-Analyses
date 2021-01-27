@@ -1,7 +1,7 @@
 ---
 title: "GTW Analyses"
 author: "KWilliams"
-date: "12/11/2020"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
@@ -156,20 +156,22 @@ d.all <- d.all %>%
          dist.error = correctR - response,
          #create variable ignoring the direction of the error
          dist.error.a = abs(dist.error),
-         #create variable and code whether the item was placed in the future (diectic status of response)
+         #create variable and code whether the item's final placement was in the future (deictic status of response)
          resp.stat = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response > correctR ~ 1, 
                                TRUE ~ 0), # "what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
-         #create variable and code whether the items correct placement is in the future
+         #create variable and code deictic status of the *first* sticker placement
          resp.stat.1 = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response1 > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response1 > correctR ~ 1, 
-                               TRUE ~ 0), # codes deictic status of the *first* sticker placement
+                               TRUE ~ 0), 
+        #create variable and code whether the item's correct placement is in the future
          item.stat = ifelse(item %in% future.words, 1, 0),
          #create variable and code whether the participant correctly placed the item in the past vs. future
          stat.correct = ifelse(item.stat == resp.stat, 1, 0),
-         stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0)) #codes whether deictic status of first sticker placement was correct
+         #create variable and code whether the deictic status of the first sticker placement was correct
+         stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0)) 
 ```
 
 8. Participant counts
@@ -211,10 +213,10 @@ cal.sum <- cal.d2 %>%
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
             se.correct = sd.correct/sqrt(n),
-            deictic1.m = mean(stat.correct.1), #for got correct status (first answer)
+            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
             rank.m = mean(correct), # right box (final answer)
-            countCor.first = sum(cor.first))  #sum proportion correct for making bar graph instead of histogram
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 
 #filter by language
 cal.e <- cal.d %>%
@@ -226,7 +228,7 @@ cal.g <- cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 cal.d %>%
-  mutate(item = factor(item, levels = ("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 ```
 
 
@@ -433,38 +435,34 @@ Anova(cal.lm.2g, Type=3)
 Wilcox_test for item level comparisons (cor.first) within each language group separately
 ```{r}
 #filter by language & remove 3 and 7-year-olds
-cal.e2 <- cal.d %>%
-  filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+cal.e2 <- cal.e %>%
+  filter(agegroup %in% c('4','5','6')) %>%
   droplevels() %>%
-  select(agegroup,language, item, cor.first) %>%
-  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+  select(agegroup, item, cor.first)
+  #mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-cal.e2$age <- as.character(cal.e2$agegroup)
-
-cal.g2 <- cal.d %>%
-  filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+cal.g2 <- cal.g %>%
+  filter(agegroup %in% c('4','5','6')) %>%
   droplevels() %>%
-  select(agegroup,language, item, cor.first) %>%
-  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
-
-cal.g2$age <- as.character(cal.g2$agegroup)
+  select(agegroup, item, cor.first)
+  #mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 #Wilcox_test for item level comparisons
 English.test <- cal.e2 %>%
-  group_by(age) %>%
-  pairwise.wilcox.test(cal.e2$cor.first, cal.e2$item, p.adjust.method = "BH")
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
+  add_significance()
 English.test
 
 German.test <- cal.g2 %>%
   group_by(agegroup) %>%
-  wilcox_test(cor.first ~ item) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
   add_significance()
 German.test
 
-English.test <- cal.e2 %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-English.test
+```
+
+```{r}}
 #calculate effect size
 English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
 English.test.effsize
