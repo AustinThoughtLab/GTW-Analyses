@@ -218,6 +218,14 @@ cal.sum <- cal.d2 %>%
             rank.m = mean(correct), # right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 
+
+# calculate percentage of trials in which kids of each age group got correct deictic status
+cal.sum2 <- cal.d2 %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            deictic1.m = mean(stat.correct.1)) # who got correct status (first answer)
+
+
 #filter by language
 cal.e <- cal.d %>%
   filter(language == "english") %>%
