@@ -218,9 +218,22 @@ cal.sum <- cal.d2 %>%
             rank.m = mean(correct), # right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 
+#include 3- and 7-year-olds in cal.sum2
+cal.sum2 <- cal.d %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
+   group_by(language, agegroup, item) %>%
+  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            rank.m = mean(correct), # right box (final answer)
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+
 
 # calculate percentage of trials in which kids of each age group got correct deictic status
-cal.sum2 <- cal.d2 %>%
+cal.sum3 <- cal.d2 %>%
   group_by(agegroup) %>%
   summarize(n = n(),
             deictic1.m = mean(stat.correct.1)) # who got correct status (first answer)
@@ -295,65 +308,83 @@ ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi 
 ```
 
 ```{r}
-#calhist.e <- calhist.e %>%
-  #mutate(CorrectSquare = case_when(item == "tomorrow"~ "5",
-                          #item == "yesterday"~ "3",
-                          #item == "aftertomorrow"~ "6",
-                          #item == "beforeyesterday"~ "2"))
-#I was going to try to use CorrectSquare to color an individual bar within each faceted graph. Haven't figured out if this will work yet. 
+#create new variable for filling correct placement
+calhist.g <- calhist.g %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                          item == "yesterday" & response1 ==  3 ~ "0",
+                          item == "aftertomorrow" & response1 ==  6 ~ "0",
+                          item == "beforeyesterday" & response1 ==  2 ~ "0"))
 
-English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1))) +
+calhist.e <- calhist.e %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                          item == "yesterday" & response1 ==  3 ~ "0",
+                          item == "aftertomorrow" & response1 ==  6 ~ "0",
+                          item == "beforeyesterday" & response1 ==  2 ~ "0"))
+
+#recode Items for Facet Labels
+calhist.g$Term[calhist.g$item == 'tomorrow'] <- "tomorrow"
+calhist.g$Term[calhist.g$item == 'yesterday'] <- "yesterday"
+calhist.g$Term[calhist.g$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.g$Term[calhist.g$item == 'aftertomorrow'] <- "after-tomorrow"
+calhist.e$Term[calhist.e$item == 'tomorrow'] <- "tomorrow"
+calhist.e$Term[calhist.e$item == 'yesterday'] <- "yesterday"
+calhist.e$Term[calhist.e$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
+
+English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = ColorBar)) +
   geom_bar() +
   #scale_fill_manual(values = c()) +
-  theme_minimal(base_size = 14) +
-  facet_grid(item~agebin) +
+  theme_minimal(base_size = 10) +
+  facet_grid(Term~agebin) +
   xlab("Square Placement") +
   ylab("Participant Count") +
-  ylim(0, 50) +
-  ggtitle("English Speakers") +
-  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
-        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+  ylim(0, 35) +
+  ggtitle("English Speakers (n = 113)") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 10, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 10),
         axis.line.y = element_line(color = "black"),
-        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
-        axis.title.x = element_text(family = "Times", color = "black", size = 14),
-        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+        axis.text.y = element_text(family = "Times", color = "black", size = 10), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 10),
+        axis.text.x = element_text(family = "Times", color = "black", size = 10)) +
   theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
                 #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black")) +
+  theme(legend.position = "none") +
   #customize facet labels
   theme(
       strip.text.x = element_text(
-        size = 14, color = "black", family = "Times"),
+        size = 10, color = "black", family = "Times"),
       strip.text.y = element_text(
-        size = 14, color = "black", family = "Times")
+        size = 10, color = "black", family = "Times")
       )
 
 English_SquarePlacements
 
-German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1))) +
+German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1), fill = ColorBar)) +
   geom_bar() +
   #scale_fill_manual(values = c()) +
-  theme_minimal(base_size = 14) +
-  facet_grid(item~agebin) +
+  theme_minimal(base_size = 10) +
+  facet_grid(Term~agebin) +
   xlab("Square Placement") +
-  ylab("Participant Count") +
-  ylim(0, 50) +
-  ggtitle("German Speakers") +
-  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
-        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+  ylab("") +
+  ylim(0, 35) +
+  ggtitle("German Speakers (n = 103)") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 10, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 10),
         axis.line.y = element_line(color = "black"),
-        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
-        axis.title.x = element_text(family = "Times", color = "black", size = 14),
-        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+        axis.text.y = element_text(family = "Times", color = "black", size = 10), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 10),
+        axis.text.x = element_text(family = "Times", color = "black", size = 10)) +
   theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
                 #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black")) +
+  theme(legend.position = "none") +
   #customize facet labels
   theme(
       strip.text.x = element_text(
-        size = 14, color = "black", family = "Times"),
+        size = 10, color = "black", family = "Times"),
       strip.text.y = element_text(
-        size = 14, color = "black", family = "Times")
+        size = 10, color = "black", family = "Times")
       )
 
 German_SquarePlacements
@@ -361,7 +392,7 @@ German_SquarePlacements
 Figure2 <- ggarrange(English_SquarePlacements, German_SquarePlacements, 
           ncol = 2, nrow = 1)
 
-ggsave(Figure2, file= "Figure2.jpeg", width = 10, height = 8, dpi = 300)
+ggsave(Figure2, file= "Figure2.jpeg", width = 8, height = 5, dpi = 300)
 ```
 
 Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
@@ -470,57 +501,6 @@ German.test
 
 ```
 
-```{r}}
-#calculate effect size
-English.test.effsize <- cal.e %>% wilcox.effsize(cdor.first~item)
-English.test.effsize
-
-German.test <- cal.g2 %>%
-  wilcox_test(cor.first ~ item) %>%
-  add_significance()
-German.test
-#calculate effect size
-German.test.effsize <- cal.g %>% wilcox.effsize(cor.first ~item)
-German.test.effsize
-
-?wilcox.test
-```
-
-Calendar Task: does language spoken, temporal location (proximal vs. distal),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
-```{r}
-cal.lm3 <-  glmer(cor.first ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
-summary(cal.lm3)
-Anova(cal.lm3, Type=3) # suggests main effects of language, proximity, and age with no interactions
-```
-
-Calendar Task: does language spoken, temporal location (proximal vs. distal),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term removed from the model]
-```{r}
-cal.lm4 <-  glmer(cor.first ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
-summary(cal.lm4)
-Anova(cal.lm4, Type=3)
-```
-
-Mixed-effects logistic regression examining the effects of age, and temporal distance on successful placement of time words in the correct squares on the first try [in English only]
-```{r}
-cal.lm.e1 = glmer(cor.first ~ prox*scale(ageyears) + (1 + item|subjid), family='binomial', data=cal.e)
-summary(cal.lm.e1)
-Anova(cal.lm.e1, Type=3) #suggests main effects, no interaction
-
-cal.lm.e2 = glmer(cor.first ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.e)
-summary(cal.lm.e2)
-Anova(cal.lm.e2, Type=3)
-```
-
-Mixed-effects logistic regression examining the effects of age, and temporal distance on successful placement of time words in the correct squares on the first try [in German only]
-```{r}
-cal.lm.g1 = glmer(cor.first ~ prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
-summary(cal.lm.g1)
-Anova(cal.lm.g1, Type=3)
-
-cal.lm.g2 = glmer(cor.first ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.g)
-summary(cal.lm.g2)
-Anova(cal.lm.g2, Type=3)
-```
 
 ```{r}
 #-language:prox:ageyears 
@@ -666,6 +646,27 @@ cal.e %>%
   group_by(item, agegroup) %>%
   summarize(mean(stat.correct))
 ```
+#check percentage of particiopants (in each language group separately) that were able to correctly recite the days of the week
+```{r}
+daysofweek <- d.all %>%
+  select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
+  filter(item == "daysofweek")
+
+German_daysofweek <- d.all %>%
+  filter(language == "german", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+
+English_daysofweek <- d.all %>%
+  filter(language == "english", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+```
+
+##########################COGSCI PAPER ANALYSES END HERE##########################
+
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
             #sd.correct = sd(cor.first, na.rm=T),
@@ -872,25 +873,6 @@ VerbalT.d <- VerbalCal.d %>%
 #transpose item (i.e., transform from long to wide format)
 VerbalT.d <- reshape(VerbalT.d, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
 ```
-#check percentage of particiopants (in each language group separately) that were able to correctly recite the days of the week
-```{r}
-daysofweek <- d.all %>%
-  select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
-  filter(item == "daysofweek")
-
-German_daysofweek <- d.all %>%
-  filter(language == "german", item == "daysofweek", exclude == "0") %>%
-  select(subjid, agegroup, correct) %>%
-  group_by(correct, agegroup) %>%
-  summarise(n())
-
-English_daysofweek <- d.all %>%
-  filter(language == "english", item == "daysofweek", exclude == "0") %>%
-  select(subjid, agegroup, correct) %>%
-  group_by(correct, agegroup) %>%
-  summarise(n())
-```
-
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 
