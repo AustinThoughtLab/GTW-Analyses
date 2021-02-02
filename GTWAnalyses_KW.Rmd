@@ -230,15 +230,20 @@ cal.sum2 <- cal.d %>%
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
             rank.m = mean(correct), # right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+```
 
-
+```{r}
 # calculate percentage of trials in which kids of each age group got correct deictic status
-cal.sum3 <- cal.d2 %>%
+cal.sum3 <- cal.d %>%
   group_by(agegroup) %>%
   summarize(n = n(),
-            deictic1.m = mean(stat.correct.1)) # who got correct status (first answer)
-
-
+            deictic1.m = (mean(stat.correct.1))*100, # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1))*100, # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), #calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, #calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) #calculate upper 95% CI
+```
+```{r}
 #filter by language
 cal.e <- cal.d %>%
   filter(language == "english") %>%
