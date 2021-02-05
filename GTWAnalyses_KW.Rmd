@@ -257,7 +257,6 @@ cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 ```
 
-
 Calendar task only: Frequency distribution of box placement for each time word
 ```{r}
 #filter by language
@@ -337,8 +336,9 @@ calhist.e$Term[calhist.e$item == 'beforeyesterday'] <- "before-yesterday"
 calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
 
 English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = ColorBar)) +
-  geom_bar() +
-  #scale_fill_manual(values = c()) +
+  geom_bar(color = "black") +
+  scale_fill_brewer() +
+  #scale_fill_grey(start = 0, end = 0.9) +
   theme_minimal(base_size = 10) +
   facet_grid(Term~agebin) +
   xlab("Square Placement") +
@@ -366,8 +366,8 @@ English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = 
 English_SquarePlacements
 
 German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1), fill = ColorBar)) +
-  geom_bar() +
-  #scale_fill_manual(values = c()) +
+  geom_bar(color = "black") +
+  scale_fill_brewer() +
   theme_minimal(base_size = 10) +
   facet_grid(Term~agebin) +
   xlab("Square Placement") +
@@ -400,6 +400,16 @@ Figure2 <- ggarrange(English_SquarePlacements, German_SquarePlacements,
 ggsave(Figure2, file= "Figure2.jpeg", width = 8, height = 5, dpi = 300)
 ```
 
+Graph Correct First Placement (but show proportion of kids who placed sticker in each box)
+```{r}
+#exclude 3- and 7-year-olds from cal.sum4
+cal.sum4 <- cal.d2 %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>%
+  group_by(language, agegroup, item, response1) %>%
+  summarize(n = n()) %>%
+  mutate(freq = n/sum(n))
+```
+
 Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
 ```{r}
 d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
@@ -414,7 +424,7 @@ summary(d.lm2)
 Anova(d.lm2, Type=3) #main effect of age
 ```
 
-Does age or item predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
+Does age or item predict successful placement of time words in the past vs. the future within each language group separately? [no interaction term]
 ```{r}
 d.lm.2e <-  glmer(stat.correct.1 ~ prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.e) 
 summary(d.lm.2e)
@@ -464,7 +474,7 @@ summary(cal.lm2)
 Anova(cal.lm2, Type=3)
 ```
 
-Does age or item predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
+Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]
 
 ```{r}
 cal.lm.2e <- glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.e) 
@@ -503,9 +513,22 @@ German.test <- cal.g2 %>%
   pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
   add_significance()
 German.test
-
 ```
 
+
+Does language group, age, and temporal location (proximal vs. distal) predict correct placement? [interaction term included in the model]
+```{r}
+cal.lm3 <-  glmer(cor.first ~ language*prox*scale(ageyears) + (1|subjid), family='binomial', data=cal.d) #FTC
+summary(cal.lm3)
+Anova(cal.lm3, Type=3) # suggests there are no main effects of language, proximity, or age and no interactions
+```
+
+Does language group, age, and temporal location (proximal vs. distal) predict correct placement? [interaction term removed from the model]
+```{r}
+cal.lm4 <-  glmer(cor.first ~ language + prox + scale(ageyears) + (1|subjid), family='binomial', data=cal.d) 
+summary(cal.lm4)
+Anova(cal.lm4, Type=3) #main effect of age
+```
 
 ```{r}
 #-language:prox:ageyears 
@@ -534,17 +557,24 @@ cal.sum$agebin[cal.sum$agegroup == '6'] <- "Age 6"
 cal.sum$languagegroup[cal.sum$language == 'english'] <- "English Speakers"
 cal.sum$languagegroup[cal.sum$language == 'german'] <- "German Speakers"
 
+#recode Item for Legend
+cal.sum$Term[cal.sum$item == 'tomorrow'] <- "tomorrow"
+cal.sum$Term[cal.sum$item == 'yesterday'] <- "yesterday"
+cal.sum$Term[cal.sum$item == 'beforeyesterday'] <- "before-yesterday"
+cal.sum$Term[cal.sum$item == 'aftertomorrow'] <- "after-tomorrow"
+
 ### plot correct first placements separately for each language group
 Englishcal_sum <- cal.sum %>%
   filter(language == "english")
 Germancal_sum <- cal.sum %>%
   filter(language == "german")
 
-EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agebin, y = first.m, group = item, color = item)) +
-  geom_line(aes(color=item)) +
+EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agebin, y = first.m, group = Term)) +
+  geom_line(aes(linetype=Term)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
   ylab('Proportion Correct') +
-  xlab('English Speakers') +
+  xlab('English Speakers (n = 116)') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
   theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
@@ -559,11 +589,12 @@ EnglishPlacements <- ggplot(data = Englishcal_sum, aes(x=agebin, y = first.m, gr
                 axis.line = element_line(colour = "black"))
 EnglishPlacements
 
-GermanPlacements <- ggplot(data=Germancal_sum, aes(x=agebin, y = first.m, group = item, color = item)) +
-  geom_line(aes(color=item)) +
+GermanPlacements <- ggplot(data=Germancal_sum, aes(x=agebin, y = first.m, group = Term)) +
+  geom_line(aes(linetype=Term)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
-  ylab('Proportion Correct') +
-  xlab('German Speakers') +
+  ylab('') +
+  xlab('German Speakers (n = 103)') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
   theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
@@ -582,21 +613,71 @@ CorrectFirstFigure <- ggarrange(EnglishPlacements, GermanPlacements,
                     ncol = 2, nrow = 1, common.legend = TRUE, legend = "top")
 CorrectFirstFigure
 
-ggsave(CorrectFirstFigure, file= "BoxPlacementByItem2.jpeg",  width = 10, height = 10, dpi = 300)
+ggsave(CorrectFirstFigure, file= "BoxPlacementByItem2.jpeg",  width = 10, height = 5, dpi = 300)
+```
+
+```{r}
+#exclude 3- and 7-year-olds from cal.sum (and collapse across language)
+cal.sum3 <- cal.d2 %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
+   group_by(agegroup, item) %>%
+  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            rank.m = mean(correct), # right box (final answer)
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+
+
+#recode agegroup
+cal.sum3$agebin[cal.sum3$agegroup == '4'] <- "Age 4"
+cal.sum3$agebin[cal.sum3$agegroup == '5'] <- "Age 5"
+cal.sum3$agebin[cal.sum3$agegroup == '6'] <- "Age 6"
+
+#recode item for Legend
+cal.sum3$Term[cal.sum3$item == 'tomorrow'] <- "tomorrow"
+cal.sum3$Term[cal.sum3$item == 'yesterday'] <- "yesterday"
+cal.sum3$Term[cal.sum3$item == 'beforeyesterday'] <- "before-yesterday"
+cal.sum3$Term[cal.sum3$item == 'aftertomorrow'] <- "after-tomorrow"
+  
+### plot correct status collapsed across language group (CogSci Figure 3)
+correctStatus <- ggplot(data=cal.sum3, 
+                        aes(x=agebin, y=deictic1.m, group=Term)) +
+  geom_line(aes(linetype=Term)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = c(0.7, 0.2)) +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+          #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+correctStatus
+ggsave(correctStatus, file= "correctStatus.jpeg", width = 5, height = 5, dpi = 300)
 ```
 
 
 ```{r}
 ### plot correct status
-correctStatus <- ggplot(data=cal.sum, aes(x=agegroup, y=deictic1.m, group=language, color=language)) +
-  geom_line(aes(color=language))+
+correctStatus <- ggplot(data=cal.sum, 
+                        aes(x=agegroup, y=deictic1.m, group=Term)) +
+  geom_line(aes(linetype=Term)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
   ylab('Proportion Correct') +
-  ylim(0,1) +
-  #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
-  facet_wrap( ~ item, nrow=2) 
+  ylim(0,1)
 correctStatus
-ggsave(correctStatus, file= "correctStatus.jpeg", width = 10, height = 10, dpi = 300)
+ggsave(correctStatus, file= "correctStatus.jpeg", width = 5, height = 5, dpi = 300)
 
 ### plot correct status by item (for each language separately)
 EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agebin, y=deictic1.m, group=item, color=item)) +
