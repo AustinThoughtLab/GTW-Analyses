@@ -5,7 +5,8 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-1. Load packages
+################################################################# Load Packages ##################################################################
+
 ```{r, echo = FALSE}
 library(tidyverse)
 library(nloptr) #needed in order to call lme4
@@ -19,44 +20,35 @@ library(car)
 library(coin)
 ```
 
-2. Read in the German language data
+######################################################### Read in the  Data ################################################################
+
 ```{r}
-#Note that 999 indicates missing data
 d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
   mutate(language = 'german',
         linenum = ifelse(item=="lastyear", 3, linenum)) # there appears to be an error where this item was incorrectly attributed to line 4
 
-#replace missing data and empty cells with NA
-d.g[d.g == "999"] <- NA 
-d.g[d.g == ""] <- NA
+d.g[d.g == "999"] <- NA # Note that 999 indicates missing data
+d.g[d.g == ""] <- NA # replace missing data and empty cells with NA
 
-#aggregate response1 and response2 columns
-d.g <- d.g %>%
-mutate(response = ifelse(is.na(response2) == T, response1, response2))
-```
-
-3. Read in the English language data
-```{r}
-#Note that 999 indicates missing data
 d.e <- read.csv('data_austin.csv')
 d.e <- d.e %>%
-  #remove unnecessary columns
-  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -covered, -comments, -experimenter) %>%
+  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -covered, -comments, -experimenter) %>% # remove unnecessary columns
   mutate(language = 'english')
 
-#replace missing data and empty cells with NA
-d.e[d.e == "999"] <- NA 
-d.e[d.e == ""] <- NA
+d.e[d.e == "999"] <- NA # Note that 999 indicates missing data
+d.e[d.e == ""] <- NA # replace missing data and empty cells with NA
 
-#aggregate response1 and response2 columns
-d.e <- d.e %>%
-mutate(response = ifelse(is.na(response2) == T, response1, response2))
+
+mutate(d.e, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1,
+                            ifelse(itemtype == 'verbal', response, response2))) # aggregate response1 and response2 columns for deictic items only
 ```
 
-4. Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)
+#################################################Some Data Management and wrangling#########################################################
+
 ```{r}
+#Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)#
 d.all <- rbind(d.g, d.e) %>% 
   mutate(item = as.factor(item),
          item = recode_factor(item, 'morning ' = 'thismorning',
@@ -74,19 +66,15 @@ d.all <- rbind(d.g, d.e) %>%
         exclude = replace_na(exclude, 0))
 
 d.all$weekday <- ifelse(d.all$weekday == "1", 7, ifelse(d.all$weekday == "2", 1, ifelse(d.all$weekday == "3", 2, ifelse(d.all$weekday == "4", 3, ifelse(d.all$weekday == "5", 4, ifelse(d.all$weekday == "6", 5, ifelse(d.all$weekday == "7", 6, 999)))))))
-        #the weekday function in excel codes everything as 1-7 from Sun-Sat so here I am just re-coding so the              variable levels match our calendar task (e.g., 1-7 from Mon-Sun)
+# weekday function in excel codes Sun-Sat as 1-7 so here I am re-coding so the variable levels match our calendar task (e.g., 1-7 from Mon-Sun)
 
-#replace missing data with NA
-d.all$weekday[d.all$weekday == "999"] <- NA 
+d.all$weekday[d.all$weekday == "999"] <- NA # replace missing data with NA
+
+future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') # Code all future time words
 ```
 
-5. Code all future time words
 ```{r}
-future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') 
-```
-
-6. Code correct responses (to compare to correctr variable) [Is there an easier way to do this?!]
-```{r}
+#Code correct responses (to compare to 'correctr' variable)
 d.all <- d.all %>%
   mutate(correctR = case_when(task == "calendar" & itemtype == "deictic" & item == "yesterday" ~ '3',
                               task == "calendar" & itemtype == "deictic" & item == "beforeyesterday" ~ '2',
@@ -95,7 +83,7 @@ d.all <- d.all %>%
                               task == "calendar" & itemtype == "verbal" & item == "aftertoday" ~ '1',
                               task == "calendar" & itemtype == "verbal" & item == "beforetoday" ~ '2',
                               task == "calendar" & itemtype == "verbal" & item == "daysofweek" ~ '7',
-                              #assuming a 1 indicates that the child correctly identified all 7 days of the week
+                              # assuming a 1 indicates that the child correctly identified all 7 days of the week
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "1" ~ "1",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "2" ~ "2",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "3" ~ "3",
@@ -103,7 +91,7 @@ d.all <- d.all %>%
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "5" ~ "5",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "6" ~ "6",
                               task == "calendar" & itemtype == "verbal" & item == "today" & weekday == "7" ~ "7",
-                              #remember that weekday values range from 1-7 and correspond to days of the week (e.g.,                               Sunday = 1, Monday = 2, etc.)
+                              # note that weekday values range from 1-7  (e.g.,Sunday = 1, Monday = 2, etc.)
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "1" ~ '7',
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "2" ~ '1',
                               task == "calendar" & itemtype =="verbal" & item =="yesterday" & weekday == "3" ~ '2',
@@ -134,14 +122,14 @@ d.all <- d.all %>%
                               task == "timeline" & linenum == "4" & item == "yesterday" ~ '2',
                               task == "timeline" & linenum == "4" & item == "tomorrow" ~ '3',
                               task == "timeline" & linenum == "4" & item == "aftertomorrow" ~ '4'))
-##seems to match correctr variable that already exists in the data file with two exceptions: verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
+## seems to match correctr variable that already exists in the data file with two exceptions: verbal 'beforetoday' and 'aftertoday' are coded as indicated on the paper coding sheet e.g., 1 or 0.
 
 check <- d.all %>%
   mutate(matchR = ifelse(correctr == correctR, 'YES', 'NO')) %>%
   filter(matchR == 'NO')   ## 74 mismatches, mostly on verbal Q's, in other cases correctR seems to be correct
 ```
 
-7. Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
+Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
 ```{r}
 d.all <- d.all %>%
   filter(exclude==0) %>%
@@ -150,31 +138,31 @@ d.all <- d.all %>%
          order = as.factor(order),
          agegroup = as.factor(agegroup),
          linenum = as.factor(linenum),
-         #create variable and code whether the item was placed in the correct rank (timeline task) or box (calendar task)
+         # create variable and code whether the item was placed in the correct rank (timeline task) or box (calendar task)
          correct = ifelse(response == correctR, 1, 0),
-         #create variable to quantify how far the rank/box placement was from the correct rank/box
+         # create variable to quantify how far the rank/box placement was from the correct rank/box
          dist.error = correctR - response,
-         #create variable ignoring the direction of the error
+         # create variable ignoring the direction of the error
          dist.error.a = abs(dist.error),
-         #create variable and code whether the item's final placement was in the future (deictic status of response)
+         # create variable and code whether the item's final placement was in the future (deictic status of response)
          resp.stat = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response > correctR ~ 1, 
                                TRUE ~ 0), # "what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
-         #create variable and code deictic status of the *first* sticker placement
+         # create variable and code deictic status of the *first* sticker placement
          resp.stat.1 = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response1 > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response1 > correctR ~ 1, 
                                TRUE ~ 0), 
-        #create variable and code whether the item's correct placement is in the future
+         # create variable and code whether the item's correct placement is in the future
          item.stat = ifelse(item %in% future.words, 1, 0),
-         #create variable and code whether the participant correctly placed the item in the past vs. future
+         # create variable and code whether the participant correctly placed the item in the past vs. future
          stat.correct = ifelse(item.stat == resp.stat, 1, 0),
-         #create variable and code whether the deictic status of the first sticker placement was correct
+         # create variable and code whether the deictic status of the first sticker placement was correct
          stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0)) 
 ```
 
-8. Participant counts
+Participant counts
 ```{r}
 subs <- d.all %>%
   select(subjid, agegroup, language) %>%
@@ -185,31 +173,27 @@ subs_counts <- subs %>%
   summarize(n())
 ```
 
-9. Calendar task only
+##################################################Calendar Task Analyses Begin Here##########################################################
+
 ```{r}
-cal.d <- d.all %>%
-#filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
-  filter(task=="calendar" & itemtype=="deictic") %>%
- #filter(agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
+calv.d <- d.all %>% 
+  filter(task == "calendar" & itemtype %in% c('deictic', 'verbal')) %>% #include all calendar items (verbal Qs too)
   select(-linelength,-distfrommid) %>%
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
-#remove 3- and 7-year-olds
-cal.d2 <- d.all %>%
-#filter only calendar items that are marked as deictic (verbal items not involved in the calendar task)
-  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
+cal.d <- d.all %>% #create data frame that includes 3- to 7-year-olds
+  filter(task=="calendar" & itemtype=="deictic") %>% # only select deictic calendar items (verbal items not involved in the calendar task)
+ # filter(agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
   select(-linelength,-distfrommid) %>%
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
-
-#exclude 3- and 7-year-olds from cal.sum
-cal.sum <- cal.d2 %>%
-  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
+cal.sum2 <- cal.d %>% # summarize data including 3- and 7-year-olds
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% # for each word, how many kids got them right on the first try
    group_by(language, agegroup, item) %>%
-  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+  summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
             se.correct = sd.correct/sqrt(n),
@@ -218,39 +202,48 @@ cal.sum <- cal.d2 %>%
             rank.m = mean(correct), # right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 
-#include 3- and 7-year-olds in cal.sum2
-cal.sum2 <- cal.d %>%
+cal.d2 <- d.all %>% # create new data frame and remove 3- and 7-year-olds
+  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% # only select deictic calendar items
+  select(-linelength,-distfrommid) %>%
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
+
+cal.sum <- cal.d2 %>% # summary of data frame excluding 3- and 7-year-olds
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
    group_by(language, agegroup, item) %>%
-  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+  summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
             se.correct = sd.correct/sqrt(n),
-            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
+            deictic1.m = mean(stat.correct.1), # % who got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
-            rank.m = mean(correct), # right box (final answer)
+            rank.m = mean(correct), # % right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 ```
 
 ```{r}
-# calculate percentage of trials in which kids of each age group got correct deictic status
+# calculate percentage of trials in which kids of each age group got correct deictic status on calendar questions
 cal.sum3 <- cal.d %>%
   group_by(agegroup) %>%
   summarize(n = n(),
             deictic1.m = (mean(stat.correct.1))*100, # who got correct status (first answer)
             deictic1.sd = (sd(stat.correct.1))*100, # standard deviation
-            deictic1.se = deictic1.sd/sqrt(n), #calculate standard error
-            deictic1.lower = deictic1.m - deictic1.se, #calculate lower 95% CI
-            deictic1.upper = deictic1.m + deictic1.se) #calculate upper 95% CI
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum <- 
 ```
+
 ```{r}
-#filter by language
-cal.e <- cal.d %>%
+cal.e <- cal.d %>% # filter english speakers only and create new data frame
   filter(language == "english") %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 cal.g <- cal.d %>%
-  filter(language == "german") %>%
+  filter(language == "german") %>% # filter german speakers only and create new data frame
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 cal.d %>%
@@ -259,12 +252,11 @@ cal.d %>%
 
 Calendar task only: Frequency distribution of box placement for each time word
 ```{r}
-#filter by language
-calhist.e <- cal.d %>%
+calhist.e <- cal.d %>% #filter english speakers and create new data frame
   filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-calhist.g <- cal.d %>%
+calhist.g <- cal.d %>% #filter german speakers and create new data frame
   filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
@@ -283,7 +275,7 @@ calhist.g$agebin[calhist.g$agegroup == '4'] <- "Age 4"
 calhist.g$agebin[calhist.g$agegroup == '5'] <- "Age 5"
 calhist.g$agebin[calhist.g$agegroup == '6'] <- "Age 6"
   
-#Frequency distributions of first response only
+# Frequency distributions of first response only
 par(mfrow=c(1,1))
 E <- ggplot(calhist.e, aes(x=response1)) +
   geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
@@ -292,7 +284,6 @@ E <- ggplot(calhist.e, aes(x=response1)) +
   ylim(0, 40) +
   theme_classic() +
   facet_grid(item ~ agebin)
-E
 
 G <- ggplot(calhist.g, aes(x=response1)) +
   geom_histogram(fille="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
@@ -301,23 +292,18 @@ G <- ggplot(calhist.g, aes(x=response1)) +
   ylim(0, 40) +
   theme_classic() +
   facet_grid(item ~ agebin)
-G
 
 histograms <- ggarrange(E, G, 
           ncol = 2, nrow = 1)
-
-histograms
-
 ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi = 300)
 ```
 
 ```{r}
-#create new variable for filling correct placement
 calhist.g <- calhist.g %>%
   mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
                           item == "yesterday" & response1 ==  3 ~ "0",
                           item == "aftertomorrow" & response1 ==  6 ~ "0",
-                          item == "beforeyesterday" & response1 ==  2 ~ "0"))
+                          item == "beforeyesterday" & response1 ==  2 ~ "0")) # create new variable for filling correct placement
 
 calhist.e <- calhist.e %>%
   mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
@@ -325,7 +311,7 @@ calhist.e <- calhist.e %>%
                           item == "aftertomorrow" & response1 ==  6 ~ "0",
                           item == "beforeyesterday" & response1 ==  2 ~ "0"))
 
-#recode Items for Facet Labels
+# recode Items for Facet Labels
 calhist.g$Term[calhist.g$item == 'tomorrow'] <- "tomorrow"
 calhist.g$Term[calhist.g$item == 'yesterday'] <- "yesterday"
 calhist.g$Term[calhist.g$item == 'beforeyesterday'] <- "before-yesterday"
@@ -338,7 +324,7 @@ calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
 English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = ColorBar)) +
   geom_bar(color = "black") +
   scale_fill_brewer() +
-  #scale_fill_grey(start = 0, end = 0.9) +
+  # scale_fill_grey(start = 0, end = 0.9) +
   theme_minimal(base_size = 10) +
   facet_grid(Term~agebin) +
   xlab("Square Placement") +
@@ -352,10 +338,10 @@ English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = 
         axis.title.x = element_text(family = "Times", color = "black", size = 10),
         axis.text.x = element_text(family = "Times", color = "black", size = 10)) +
   theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
-                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                # panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black")) +
   theme(legend.position = "none") +
-  #customize facet labels
+  # customize facet labels
   theme(
       strip.text.x = element_text(
         size = 10, color = "black", family = "Times"),
@@ -475,7 +461,6 @@ Anova(cal.lm2, Type=3)
 ```
 
 Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]
-
 ```{r}
 cal.lm.2e <- glmer(cor.first ~ item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.e) 
 summary(cal.lm.2e)
@@ -732,6 +717,7 @@ cal.e %>%
   group_by(item, agegroup) %>%
   summarize(mean(stat.correct))
 ```
+
 #check percentage of particiopants (in each language group separately) that were able to correctly recite the days of the week
 ```{r}
 daysofweek <- d.all %>%
@@ -752,6 +738,53 @@ English_daysofweek <- d.all %>%
 ```
 
 ##########################COGSCI PAPER ANALYSES END HERE##########################
+
+##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
+```{r}
+
+d.all
+
+#create new data frame
+target <- c("verbal", "deictic")
+Calvd.d <- d.all %>%
+  filter(task=="calendar" & itemtype == target) %>% # filter only calendar %>%
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox)) %>%
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure we are confident correctR is accurately coded
+
+#create new data frame (verbal items only)
+Calv.dg <- Calvd.d %>%
+  filter(itemtype == "verbal", language == "german") %>%
+  select (subjid, agegroup, item, correct, cor.first)
+
+Calv.de <- Calvd.d %>%
+  filter(itemtype == "verbal", language == "english") %>%
+  select (subjid, agegroup, item, correct, cor.first)
+  
+#transpose item (i.e., transform from long to wide format)
+Calv.dgT  <- reshape(Calv.dg, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+Calv.deT <- reshape(CAlv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+```
+
+##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
@@ -937,30 +970,6 @@ German_boxplot
 ggsave(German_boxplot, file= "GermanBoxPlot.jpeg", width = 12, height = 10, dpi = 300)
 ```
 
-
-##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
-```{r}
-#create new data frame
-target <- c("verbal", "deictic")
-VerbalCal.d <- d.all %>%
-  filter(task=="calendar" & itemtype == target & agegroup %in% c('4','5','6') & ageyears<7.0) %>% #filter only calendar items that are marked as deictic and verbal items
-  select(-linelength,-distfrommid) %>%
-  mutate(cor.first = ifelse(response1==correctR, 1, 0), #did they get it right on the first trial
-         prox = ifelse(itemtype == "deictic" & item %in% c('yesterday','tomorrow'),1, NA),#yesterday&tomorrow coded as proximal terms
-         distal = ifelse(itemtype == "deictic" & item %in% c('beforeyesterday', 'aftertomorrow'),0, NA),#beforeyesterday%aftertomorrow coded as distal terms
-         prox = as.factor(prox), 
-         distal = as.factor(distal))
-
-#create new data frame (verbal items only)
-VerbalT.d <- VerbalCal.d %>%
-  filter(itemtype == "verbal") %>%
-  select (subjid, agegroup, language, task, item, itemtype, correct, cor.first)
-  
-#transpose item (i.e., transform from long to wide format)
-VerbalT.d <- reshape(VerbalT.d, idvar = c("subjid", "agegroup", "language"), timevar = "item", direction = "wide")
-```
-
-##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 
 #Mixed-effects logistic regression examining the effects of age, and verbal Qs on children’s successful placement of time words in the correct squares on the first try
 ```{r}
