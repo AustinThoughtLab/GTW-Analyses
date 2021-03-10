@@ -20,7 +20,7 @@ library(car)
 library(coin)
 ```
 
-######################################################### Read in the  Data ################################################################
+######################################################## Read in the  Data ################################################################
 
 ```{r}
 d.g <- read.csv('german_12112019.csv')
@@ -744,6 +744,9 @@ English_daysofweek <- d.all %>%
 
 d.all
 
+#verbal_items <-  c("verbal") # pull out rows with verbal items
+#deictic_items <- c("deictic") # pull out rows with verbal items
+
 #create new data frame
 target <- c("verbal", "deictic")
 Calvd.d <- d.all %>%
@@ -751,7 +754,11 @@ Calvd.d <- d.all %>%
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox)) %>%
-  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure we are confident correctR is accurately coded
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is #accurately coded
+```
+
+```{r}
+# create a new variable that sums up the # of verbal items correct
 
 #create new data frame (verbal items only)
 Calv.dg <- Calvd.d %>%
@@ -764,7 +771,16 @@ Calv.de <- Calvd.d %>%
   
 #transpose item (i.e., transform from long to wide format)
 Calv.dgT  <- reshape(Calv.dg, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
-Calv.deT <- reshape(CAlv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+Calv.dgT$verbal_score_corfirst <- rowSums(Calv.dgT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) #ignore missing data
+
+Calv.deT <- reshape(Calv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+#Calv.deT$verbal_score_corfirst <- rowSums(Calv.deT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) #ignore missing data
+
+# deictic_score = X
+
+# combine scores into one data.fram
+
+# conduct paired sample t-test
 ```
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
