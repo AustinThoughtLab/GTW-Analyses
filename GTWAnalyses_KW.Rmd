@@ -232,9 +232,6 @@ cal.sum3 <- cal.d %>%
             deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
             deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
             deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
-
-#calculate percentage of trials in which kids of each age group got verbal questions correct
-verbal.sum <- 
 ```
 
 ```{r}
@@ -718,7 +715,7 @@ cal.e %>%
   summarize(mean(stat.correct))
 ```
 
-#check percentage of particiopants (in each language group separately) that were able to correctly recite the days of the week
+#check percentage of participants (in each language group separately) that were able to correctly recite the days of the week
 ```{r}
 daysofweek <- d.all %>%
   select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
@@ -740,68 +737,95 @@ English_daysofweek <- d.all %>%
 ##########################COGSCI PAPER ANALYSES END HERE##########################
 
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
+
 ```{r}
-
-d.all
-
-#verbal_items <-  c("verbal") # pull out rows with verbal items
-#deictic_items <- c("deictic") # pull out rows with verbal items
-
 #create new data frame
 target <- c("verbal", "deictic")
 Calvd.d <- d.all %>%
   filter(task=="calendar" & itemtype == target) %>% # filter only calendar %>%
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox)) %>%
-  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is #accurately coded
-```
+         prox = as.factor(prox))
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is # accurately coded
 
-```{r}
-# create a new variable that sums up the # of verbal items correct
+verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
-#create new data frame (verbal items only)
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum <- Calvd.d %>%
+  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item %in% c('aftertoday', 'beforetoday', 'yesterday', 'tomorrow', 'today')) %>% #filter only 5 verbal questions
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T),
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n),
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+deictic.sum <- Calvd.d %>%
+  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.d = mean(cor.first, na.rm=T), # % who answered correctly
+            sd.correct.d = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct.d = sd.correct.d/sqrt(n),
+            countCorrect.d = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+
+sum.all <- rbind(verbal.sum, deictic.sum) # combine data into one data frame
+sum.all.g <- sum.all %>%
+  filter(language == "german")
+sum.all.e <- sum.all %>%
+  filter(language == "english")
+
 Calv.dg <- Calvd.d %>%
-  filter(itemtype == "verbal", language == "german") %>%
-  select (subjid, agegroup, item, correct, cor.first)
+  filter(language == "german")
+German_VerbalQuestions <- ggplot(Calv.dg, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+German_VerbalQuestions
+
+#Wilcox_test
+German.test2 <- Calv.dg %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+German.test2
 
 Calv.de <- Calvd.d %>%
-  filter(itemtype == "verbal", language == "english") %>%
-  select (subjid, agegroup, item, correct, cor.first)
-  
-#transpose item (i.e., transform from long to wide format)
-Calv.dgT  <- reshape(Calv.dg, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
-Calv.dgT$verbal_score_corfirst <- rowSums(Calv.dgT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) #ignore missing data
+  filter(language == "english")
+English_VerbalQuestions <- ggplot(Calv.de, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+English_VerbalQuestions
 
-Calv.deT <- reshape(Calv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
-#Calv.deT$verbal_score_corfirst <- rowSums(Calv.deT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) #ignore missing data
-
-# deictic_score = X
-
-# combine scores into one data.fram
-
-# conduct paired sample t-test
+#Wilcox_test
+English.test2 <- Calv.de %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+English.test2
 ```
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
+```{r}
+#create new data frame (verbal items only)
+#German data only
+#Calv.dg <- Calvd.d %>%
+  #filter(itemtype == "verbal", language == "german") %>%
+  #select (subjid, agegroup, item, correct, cor.first)
+# create a new variable that sums up the # of verbal items correct
+# transpose item (i.e., transform from long to wide format)
+#Calv.dgT  <- reshape(Calv.dg, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+#Calv.dgT$verbal_score <-rowSums(Calv.dgT[,c("correct.beforetoday", "correct.yesterday")], na.rm = TRUE)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#English data only
+#Calv.de <- Calvd.d %>%
+  #filter(itemtype == "verbal", language == "english") %>%
+  #select (subjid, agegroup, item, correct, cor.first)
+#Calv.deT  <- reshape(Calv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
+#Calv.deT$verbal_score_corfirst <- rowSums(Calv.deT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) 
+#Calv.deT$verbal_score <-rowSums(Calv.deT[,c("correct.beforetoday", "correct.yesterday")], na.rm = TRUE)
+```
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
             #sd.correct = sd(cor.first, na.rm=T),
