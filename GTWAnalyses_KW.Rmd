@@ -748,6 +748,41 @@ Calvd.d <- d.all %>%
          prox = as.factor(prox))
   select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is # accurately coded
 
+Calvd.d$correct <- factor(Calvd.d$correct) #tell r to use correct as a factor variable
+verbal.deictic <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calvd.d) #run logistic regression
+summary(verbal.deictic)
+
+Calv.dg <- Calvd.d %>% # filter out german participants only
+  filter(language == "german")
+German_VerbalQuestions <- ggplot(Calv.dg, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+German_VerbalQuestions
+
+German.test2 <- Calv.dg %>% # conduct Wilcox_test on english sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+German.test2
+
+Calv.de <- Calvd.d %>% # filter out english participants only
+  filter(language == "english")
+English_VerbalQuestions <- ggplot(Calv.de, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+English_VerbalQuestions
+
+English.test2 <- Calv.de %>% # conduct Wilcox_test on english sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+English.test2
+  
+```
+  
+```{r}
 verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
 #calculate percentage of trials in which kids of each age group got verbal questions correct
@@ -774,40 +809,37 @@ sum.all.g <- sum.all %>%
   filter(language == "german")
 sum.all.e <- sum.all %>%
   filter(language == "english")
-
-Calv.dg <- Calvd.d %>%
-  filter(language == "german")
-German_VerbalQuestions <- ggplot(Calv.dg, aes(x = factor(correct))) +
-  geom_bar(color = "black") +
-  theme_minimal(base_size = 10) +
-  facet_grid(itemtype~agegroup)
-German_VerbalQuestions
-
-#Wilcox_test
-German.test2 <- Calv.dg %>%
-  group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
-  add_significance()
-German.test2
-
-Calv.de <- Calvd.d %>%
-  filter(language == "english")
-English_VerbalQuestions <- ggplot(Calv.de, aes(x = factor(correct))) +
-  geom_bar(color = "black") +
-  theme_minimal(base_size = 10) +
-  facet_grid(itemtype~agegroup)
-English_VerbalQuestions
-
-#Wilcox_test
-English.test2 <- Calv.de %>%
-  group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
-  add_significance()
-English.test2
 ```
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 ```{r}
+Calv.d2 <- Calv.dg %>%
+  filter(itemtype %in% c('verbal', 'deictic')) %>%
+  select(subjid, agegroup, language, itemtype, item, response,correctR, correct)
+Calv.d2T  <- reshape(Calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
+
+Calv.d2T <- Calv.d2T %>%
+  mutate(days_correct = case_when(item.verbal == "daysofweek" & correct.verbal == '1' ~ '1',
+                                  item.verbal == "daysofweek" & correct.verbal == '0' ~ '0'))
+```
+
+
+````{r}
+Calv.d2T$
+Calvd.d.days <- Calvd.d %>%
+  select_if(item == "daysofweek" & correct == 1) %>% # only select kids who
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is # accurately coded
+
+
+
+
+
+
+
+
 #create new data frame (verbal items only)
 #German data only
 #Calv.dg <- Calvd.d %>%
