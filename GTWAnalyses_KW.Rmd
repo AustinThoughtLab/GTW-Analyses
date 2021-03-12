@@ -41,8 +41,11 @@ d.e[d.e == "999"] <- NA # Note that 999 indicates missing data
 d.e[d.e == ""] <- NA # replace missing data and empty cells with NA
 
 
-mutate(d.e, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1,
+d.e <- mutate(d.e, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1,
                             ifelse(itemtype == 'verbal', response, response2))) # aggregate response1 and response2 columns for deictic items only
+
+d.g <- mutate(d.g, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1, 
+                              ifelse(itemtype == 'verbal', response, response2)))
 ```
 
 #################################################Some Data Management and wrangling#########################################################
@@ -153,13 +156,48 @@ d.all <- d.all %>%
          resp.stat.1 = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response1 > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response1 > correctR ~ 1, 
-                               TRUE ~ 0), 
+                               TRUE ~ 0),
          # create variable and code whether the item's correct placement is in the future
          item.stat = ifelse(item %in% future.words, 1, 0),
          # create variable and code whether the participant correctly placed the item in the past vs. future
          stat.correct = ifelse(item.stat == resp.stat, 1, 0),
          # create variable and code whether the deictic status of the first sticker placement was correct
-         stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0)) 
+         stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0))
+```
+
+Create new variables to code correct remoteness status of responses on the calendar and timeline tasks:
+1. calculate response remoteness on calendar task: abs(response placement - location of 'today'))
+2. code correct remoteness on calendar task: 1 = yesterday/tomorrow; 2 = beforeyesterday/aftertomorrow
+3. calculate response remoteness on teimeline task: Rank 1 = -7 < x < -3.5; Rank 2 = -3.5 < x < 0; Rank 3 = 0 < x < 3.5; Rank 4 = 3.5 < x < 7
+4. calculate correct remoteness on timeline task: if response remoteness falls within appropriate numerical range
+```{r}
+d.all <- d.all %>%
+  # create a variable to quantify how far the rank/box placement was from 'today'
+  mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ abs(response - 4))) %>% 
+  # create new variable to code if response remoteness was correct for all items on the calendar and timeline tasks
+  mutate(cor.remote = case_when(task == "calendar" & itemtype == "deictic" & item == "yesterday" & resp.remoteness == '1' ~ '1',
+                                task == "calendar" & itemtype == "deictic" & item == "beforeyesterday" & resp.remoteness == '2' ~ '1',
+                                task == "calendar" & itemtype == "deictic" & item == "tomorrow" & resp.remoteness == '1' ~ '1',
+                                task == "calendar" & itemtype == "deictic" & item == "aftertomorrow" & resp.remoteness == '2' ~ '1',
+                                task == "timeline" & linenum == "1" & item == "lastbday" & between(distfrommid, -7, -3.5) ~ '1',
+                                task == "timeline" & linenum == "1" & item == "breakfast" & between(distfrommid, -3.5, 0) ~ '1',
+                                task == "timeline" & linenum == "1" & item == "dinner" & between(distfrommid, 0, 3.5) ~ '1', 
+                                task == "timeline" & linenum == "1" & item == "nextbday" & between(distfrommid, 3.5, 7) ~ '1',
+                                task == "timeline" & linenum == "2" & item == "lastweek" & between(distfrommid, -7, -3.5) ~ '1',
+                                task == "timeline" & linenum == "2" & item == "thismorning" & between(distfrommid, -3.5, 0) ~ '1',
+                                task == "timeline" & linenum == "2" & item == "tonight" & between(distfrommid, 0, 3.5) ~ '1',
+                                task == "timeline" & linenum == "2" & item == "tomorrow" & between(distfrommid, 3.5, 7) ~ '1',
+                                task == "timeline" & linenum == "3" & item == "lastyear" & between(distfrommid, -7, -3.5) ~ '1',
+                                task == "timeline" & linenum == "3" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                task == "timeline" & linenum == "3" & item == "nextweek" & between(distfrommid, 0, 3.5) ~ '1',
+                                task == "timeline" & linenum == "3" & item == "nextyear" & between(distfrommid, 3.5, 7) ~ '1',
+                                task == "timeline" & linenum == "4" & item == "beforeyesterday" & between(distfrommid, -7, -3.5) ~ '1',
+                                task == "timeline" & linenum == "4" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                task == "timeline" & linenum == "4" & item == "tomorrow" & between(distfrommid, 0, 3.5) ~ '1',
+                                task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1'))
+
+d.all$cor.remote[is.na(d.all$cor.remote) == T] <- '0' # replace missing data with 0
+d.all$cor.remote <- as.numeric(d.all$cor.remote) # convert from character length to numeric variable
 ```
 
 Participant counts
@@ -190,6 +228,7 @@ cal.d <- d.all %>% #create data frame that includes 3- to 7-year-olds
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
+
 cal.sum2 <- cal.d %>% # summarize data including 3- and 7-year-olds
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% # for each word, how many kids got them right on the first try
    group_by(language, agegroup, item) %>%
@@ -211,19 +250,20 @@ cal.d2 <- d.all %>% # create new data frame and remove 3- and 7-year-olds
 
 cal.sum <- cal.d2 %>% # summary of data frame excluding 3- and 7-year-olds
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
-   group_by(language, agegroup, item) %>%
+  group_by(language, agegroup, item) %>%
   summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
             se.correct = sd.correct/sqrt(n),
             deictic1.m = mean(stat.correct.1), # % who got correct status (first answer)
             deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            remoteness.m = mean(cor.remote), # % who got correct remoteness
             rank.m = mean(correct), # % right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 ```
 
 ```{r}
-# calculate percentage of trials in which kids of each age group got correct deictic status on calendar questions
+# calculate percentage of trials kids of each age group responded with correct deictic status on calendar questions
 cal.sum3 <- cal.d %>%
   group_by(agegroup) %>%
   summarize(n = n(),
@@ -232,6 +272,16 @@ cal.sum3 <- cal.d %>%
             deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
             deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
             deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+# calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
+cal.sum5 <- cal.d %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
 ```
 
 ```{r}
@@ -544,8 +594,10 @@ cal.sum$Term[cal.sum$item == 'tomorrow'] <- "tomorrow"
 cal.sum$Term[cal.sum$item == 'yesterday'] <- "yesterday"
 cal.sum$Term[cal.sum$item == 'beforeyesterday'] <- "before-yesterday"
 cal.sum$Term[cal.sum$item == 'aftertomorrow'] <- "after-tomorrow"
+```
 
-### plot correct first placements separately for each language group
+Plot correct first placements separately for each language group
+```{r}
 Englishcal_sum <- cal.sum %>%
   filter(language == "english")
 Germancal_sum <- cal.sum %>%
@@ -612,19 +664,18 @@ cal.sum3 <- cal.d2 %>%
             rank.m = mean(correct), # right box (final answer)
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 
-
-#recode agegroup
-cal.sum3$agebin[cal.sum3$agegroup == '4'] <- "Age 4"
+cal.sum3$agebin[cal.sum3$agegroup == '4'] <- "Age 4" #recode agegroup
 cal.sum3$agebin[cal.sum3$agegroup == '5'] <- "Age 5"
 cal.sum3$agebin[cal.sum3$agegroup == '6'] <- "Age 6"
 
-#recode item for Legend
-cal.sum3$Term[cal.sum3$item == 'tomorrow'] <- "tomorrow"
+cal.sum3$Term[cal.sum3$item == 'tomorrow'] <- "tomorrow" #recode item for Legend
 cal.sum3$Term[cal.sum3$item == 'yesterday'] <- "yesterday"
 cal.sum3$Term[cal.sum3$item == 'beforeyesterday'] <- "before-yesterday"
 cal.sum3$Term[cal.sum3$item == 'aftertomorrow'] <- "after-tomorrow"
-  
-### plot correct status collapsed across language group (CogSci Figure 3)
+```
+
+Plot correct status collapsed across language group (CogSci Figure 3)
+```{r}
 correctStatus <- ggplot(data=cal.sum3, 
                         aes(x=agebin, y=deictic1.m, group=Term)) +
   geom_line(aes(linetype=Term)) +
@@ -648,9 +699,8 @@ correctStatus
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 5, height = 5, dpi = 300)
 ```
 
-
+Plot correct status (again)
 ```{r}
-### plot correct status
 correctStatus <- ggplot(data=cal.sum, 
                         aes(x=agegroup, y=deictic1.m, group=Term)) +
   geom_line(aes(linetype=Term)) +
@@ -660,8 +710,10 @@ correctStatus <- ggplot(data=cal.sum,
   ylim(0,1)
 correctStatus
 ggsave(correctStatus, file= "correctStatus.jpeg", width = 5, height = 5, dpi = 300)
+```
 
-### plot correct status by item (for each language separately)
+Plot correct status by item (for each language separately)
+```{r}
 EnglishStatus <- ggplot(data=Englishcal_sum, aes(x=agebin, y=deictic1.m, group=item, color=item)) +
   geom_line(aes(color=item))+
   geom_point() +
@@ -705,7 +757,9 @@ CorrectStatusFigure <- ggarrange(EnglishStatus, GermanStatus,
 CorrectStatusFigure
 
 ggsave(CorrectStatusFigure, file="correctStatusFigure.jpeg", width = 10, height = 5, dpi = 300)
+```
 
+```{r}
 ## check on bizarre results: English speaking older kids are doing worse with yesterday and tomorrow than the younger ones (not a problem anymore since we corrected the data files, yay!)
 Englishcal_sum%>%
   group_by(item, agegroup) %>%
@@ -737,7 +791,7 @@ English_daysofweek <- d.all %>%
 ##########################COGSCI PAPER ANALYSES END HERE##########################
 
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
-
+##use verbal Q's to predict deictic Q's performance
 ```{r}
 #create new data frame
 target <- c("verbal", "deictic")
@@ -781,7 +835,69 @@ English.test2 <- Calv.de %>% # conduct Wilcox_test on english sample only
 English.test2
   
 ```
-  
+##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
+```{r}
+Calv.d2 <- Calvd.d %>%
+  filter(itemtype %in% c('verbal', 'deictic')) %>%
+  select(subjid, agegroup, language, itemtype, item, correct)
+Calv.d2T  <- reshape(Calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
+#create new variable to code whether child correctly recited the days of the week
+Calv.d2T <- Calv.d2T %>%
+  mutate(daysofweek_cor = case_when(item.verbal == "daysofweek" & correct.verbal == '1' ~ '1',
+                                  item.verbal == "daysofweek" & correct.verbal == '0' ~ '0'))
+
+Calv.d2T1 <- Calv.d2T %>%
+  filter(daysofweek_cor == '1') %>% #select only kids who correctly recited the days of the week
+  select(-language.deictic)
+
+Calv.d3 <- reshape(Calv.d2T1, #transpose data back to long format
+                   direction = "long",
+                   varying = c("correct.verbal", "correct.deictic"), 
+                   v.names = c('correct'),
+                   timevar = "itemtype", #1 = verbal, 2 = deictic
+                   idvar = c("subjid", "agegroup"))
+
+Calv.d3 <- Calv.d3 %>%
+  mutate(item = case_when(itemtype == '1' ~ item.verbal, # recode new item variable
+                          itemtype == '2' ~ item.deictic)) %>%
+  mutate(itemtype = case_when(itemtype == '1' ~ 'verbal', # recode itemtype
+                              itemtype == '2' ~ 'deictic')) %>%
+  mutate(language = language.verbal) %>% # recode language
+  select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
+
+##For children who recited the days of the week, does performance on verbal Q's predict performance on deictic Q's?
+verbal.deictic2 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d3) #run logistic regression
+summary(verbal.deictic2)
+
+Calv.d2T0 <- Calv.d2T %>%
+  filter(daysofweek_cor == '0') %>% #select kids who did not correctly recite the days of the week
+  select(-language.deictic)
+
+Calv.d4 <- reshape(Calv.d2T0, #transpose data back to long format
+                   direction = "long",
+                   varying = c("correct.verbal", "correct.deictic"), 
+                   v.names = c('correct'),
+                   timevar = "itemtype", #1 = verbal, 2 = deictic
+                   idvar = c("subjid", "agegroup"))
+
+Calv.d4 <- Calv.d4 %>%
+  mutate(item = case_when(itemtype == '1' ~ item.verbal, # recode new item variable
+                          itemtype == '2' ~ item.deictic)) %>%
+  mutate(itemtype = case_when(itemtype == '1' ~ 'verbal', # recode itemtype
+                              itemtype == '2' ~ 'deictic')) %>%
+  mutate(language = language.verbal) %>% # recode language
+  select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
+
+##For children who did not recite the days of the week correctly, does performance on verbal Q's predict performance on deictic Q's?
+verbal.deictic3 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d4) #run logistic regression
+summary(verbal.deictic3)
+
+##run model on all kids (regardless of whether they recited the days of the week correctly or not)
+Calv.d5 <- rbind(Calv.d3, Calv.d4)
+verbal.deictic4 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d5) #run logistic regression
+summary(verbal.deictic4)
+```
+
 ```{r}
 verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
@@ -811,35 +927,9 @@ sum.all.e <- sum.all %>%
   filter(language == "english")
 ```
 
-##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
-```{r}
-Calv.d2 <- Calv.dg %>%
-  filter(itemtype %in% c('verbal', 'deictic')) %>%
-  select(subjid, agegroup, language, itemtype, item, response,correctR, correct)
-Calv.d2T  <- reshape(Calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
-
-Calv.d2T <- Calv.d2T %>%
-  mutate(days_correct = case_when(item.verbal == "daysofweek" & correct.verbal == '1' ~ '1',
-                                  item.verbal == "daysofweek" & correct.verbal == '0' ~ '0'))
-```
-
+#######################################completed analyses end here###################################################
 
 ````{r}
-Calv.d2T$
-Calvd.d.days <- Calvd.d %>%
-  select_if(item == "daysofweek" & correct == 1) %>% # only select kids who
-  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
-         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))
-  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is # accurately coded
-
-
-
-
-
-
-
-
 #create new data frame (verbal items only)
 #German data only
 #Calv.dg <- Calvd.d %>%
