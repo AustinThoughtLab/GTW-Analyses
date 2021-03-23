@@ -44,8 +44,8 @@ d.e[d.e == ""] <- NA # replace missing data and empty cells with NA
 d.e <- mutate(d.e, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1,
                             ifelse(itemtype == 'verbal', response, response2))) # aggregate response1 and response2 columns for deictic items only
 
-d.g <- mutate(d.g, response = ifelse(itemtype == 'deictic' & is.na(response2) == T, response1, 
-                              ifelse(itemtype == 'verbal', response, response2)))
+d.g <- mutate(d.g, response = ifelse(itemtype %in% c('deictic', 'event') & is.na(response2) == T, response1, 
+                              ifelse(itemtype == 'verbal', response1, response2)))
 ```
 
 #################################################Some Data Management and wrangling#########################################################
@@ -790,23 +790,145 @@ English_daysofweek <- d.all %>%
 
 ##########################COGSCI PAPER ANALYSES END HERE##########################
 
+#does age or item predict children's performance on verbal questions?
+```{r}
+Cal.v <- d.all %>%
+  filter(task=="calendar" & itemtype == 'verbal') %>% # filter only verbal calendar items %>%
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>% # make sure correctR is # accurately coded
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
+
+#Cal.v$correct <- factor(Cal.v$correct) #tell r to use correct as a factor variable
+
+#age.verbal <- glm(correct ~ scale(ageyears), family = binomial(link='logit'), data=Cal.v)
+#summary(age.verbal)
+#Anova(age.verbal, Type =3)
+
+age.verbal2 <- glm(correct ~ item*scale(ageyears), family = binomial(link='logit'), data=Cal.v) #subject not included as a random factor
+summary(age.verbal2)
+Anova(age.verbal2, Type =3)
+
+#### run above model again without the days of the week question
+target_item <- c("aftertoday", "beforetoday", "today", "yesterday", "tomorrow")
+Cal.v2 <- d.all %>%
+  filter(task=="calendar" & itemtype == 'verbal' & item == target_item) %>% # filter verbal Qs but omit days of the week Q %>%
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>% # make sure correctR is # accurately coded
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
+
+age.verbal3 <- glm(correct ~ item*scale(ageyears), family = binomial(link='logit'), data=Cal.v2)
+summary(age.verbal3)
+Anova(age.verbal3, Type =3)
+
+##add language to the model
+age.verbal4 <- glm(correct ~ language*item*scale(ageyears), family = binomial(link='logit'), data=Cal.v2)
+summary(age.verbal4)
+Anova(age.verbal4, Type =3)
+```
+
+Wilcox_test for item level comparisons (correct) within each language group separately
+```{r}
+#filter by language 
+Cal.v2e <- Cal.v2 %>%
+  filter(language == 'english') %>%
+  filter(agegroup %in% c('4','5','6')) %>%
+  droplevels() %>%
+  select(agegroup, item, correct)
+
+Cal.v2g <- Cal.v2 %>%
+  filter(language == 'german') %>%
+  filter(agegroup %in% c('4','5','6')) %>%
+  droplevels() %>%
+  select(agegroup, item, correct)
+
+#Wilcox_test for item level comparisons
+English.testv <- Cal.v2e %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+English.testv
+
+German.testv <- Cal.v2g %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+German.testv
+```
+Calculate % of children who correctly answered verbal questions
+```{r}
+verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
+
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum <- d.all %>%
+  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+verbal.sum2 <- d.all %>%
+  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(language, agegroup) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+verbal.sum3 <- d.all %>%
+  filter(itemtype == "verbal" & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(agegroup) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+deictic.sum <- Calvd.d %>%
+  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.d = mean(cor.first, na.rm=T), # % who answered correctly
+            sd.correct.d = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct.d = sd.correct.d/sqrt(n),
+            deicticv.lower = correct.m.d - se.correct.d, # calculate lower 95% CI
+            deicticv.upper = correct.m.d + se.correct.d, # calculate upper 95% CI
+            countCorrect.d = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+
+sum.all <- rbind(verbal.sum, deictic.sum) # combine data into one data frame
+sum.all.g <- sum.all %>%
+  filter(language == "german")
+sum.all.e <- sum.all %>%
+  filter(language == "english")
+```
+
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
 ##use verbal Q's to predict deictic Q's performance
 ```{r}
 #create new data frame
 target <- c("verbal", "deictic")
-Calvd.d <- d.all %>%
+Cal.v3 <- d.all %>%
   filter(task=="calendar" & itemtype == target) %>% # filter only calendar %>%
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>% # make sure correctR is # accurately coded
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
-  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) # make sure correctR is # accurately coded
 
-Calvd.d$correct <- factor(Calvd.d$correct) #tell r to use correct as a factor variable
-verbal.deictic <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calvd.d) #run logistic regression
+verbal.deictic <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
 summary(verbal.deictic)
+Anova(verbal.deictic)
 
-Calv.dg <- Calvd.d %>% # filter out german participants only
+Calv.dg <- Cal.v3 %>% # filter out German participants only
   filter(language == "german")
 German_VerbalQuestions <- ggplot(Calv.dg, aes(x = factor(correct))) +
   geom_bar(color = "black") +
@@ -814,13 +936,12 @@ German_VerbalQuestions <- ggplot(Calv.dg, aes(x = factor(correct))) +
   facet_grid(itemtype~agegroup)
 German_VerbalQuestions
 
-German.test2 <- Calv.dg %>% # conduct Wilcox_test on english sample only
+German.test2 <- Calv.dg %>% # conduct Wilcox_test on German sample only
   group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
-  add_significance()
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH")
 German.test2
 
-Calv.de <- Calvd.d %>% # filter out english participants only
+Calv.de <- Cal.v3 %>% # filter out english participants only
   filter(language == "english")
 English_VerbalQuestions <- ggplot(Calv.de, aes(x = factor(correct))) +
   geom_bar(color = "black") +
@@ -835,6 +956,7 @@ English.test2 <- Calv.de %>% # conduct Wilcox_test on english sample only
 English.test2
   
 ```
+
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 ```{r}
 Calv.d2 <- Calvd.d %>%
@@ -896,35 +1018,13 @@ summary(verbal.deictic3)
 Calv.d5 <- rbind(Calv.d3, Calv.d4)
 verbal.deictic4 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d5) #run logistic regression
 summary(verbal.deictic4)
+Anova(verbal.deictic4)
 ```
 
 ```{r}
-verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
-
-#calculate percentage of trials in which kids of each age group got verbal questions correct
-verbal.sum <- Calvd.d %>%
-  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item %in% c('aftertoday', 'beforetoday', 'yesterday', 'tomorrow', 'today')) %>% #filter only 5 verbal questions
-  group_by(language, agegroup, item) %>%
-  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
-            sd.correct.v = sd(correct, na.rm=T),
-            n = n(),
-            se.correct.v = sd.correct.v/sqrt(n),
-            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
-
-deictic.sum <- Calvd.d %>%
-  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
-  group_by(language, agegroup, item) %>%
-  summarize(correct.m.d = mean(cor.first, na.rm=T), # % who answered correctly
-            sd.correct.d = sd(cor.first, na.rm=T),
-            n = n(),
-            se.correct.d = sd.correct.d/sqrt(n),
-            countCorrect.d = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
-
-sum.all <- rbind(verbal.sum, deictic.sum) # combine data into one data frame
-sum.all.g <- sum.all %>%
-  filter(language == "german")
-sum.all.e <- sum.all %>%
-  filter(language == "english")
+remote1 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
+summary(verbal.deictic)
+Anova(verbal.deictic)
 ```
 
 #######################################completed analyses end here###################################################
