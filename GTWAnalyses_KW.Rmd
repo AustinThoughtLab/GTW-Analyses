@@ -8,16 +8,19 @@ output: html_document
 ################################################################# Load Packages ##################################################################
 
 ```{r, echo = FALSE}
-library(tidyverse)
-library(nloptr) #needed in order to call lme4
+library(tidyverse) # for reshaping data
+library(nloptr) # for calling lme4
 library(lme4)
-library(ggplot2)
+library(ggplot2) # plotting data
 library(reshape2)
 library(ggpubr)
-library(dplyr)
+library(dplyr) # for data manipulation
 library(rstatix)
 library(car)
 library(coin)
+library(scales)  # for scale_y_continuous(label = percent)
+library(ggthemes)   # for scale_fill_few('medium')
+library('ztable')     # format tables for reporting
 ```
 
 ######################################################## Read in the  Data ################################################################
@@ -175,10 +178,7 @@ d.all <- d.all %>%
   # create a variable to quantify how far the rank/box placement was from 'today'
   mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ abs(response - 4))) %>% 
   # create new variable to code if response remoteness was correct for all items on the calendar and timeline tasks
-  mutate(cor.remote = case_when(task == "calendar" & itemtype == "deictic" & item == "yesterday" & resp.remoteness == '1' ~ '1',
-                                task == "calendar" & itemtype == "deictic" & item == "beforeyesterday" & resp.remoteness == '2' ~ '1',
-                                task == "calendar" & itemtype == "deictic" & item == "tomorrow" & resp.remoteness == '1' ~ '1',
-                                task == "calendar" & itemtype == "deictic" & item == "aftertomorrow" & resp.remoteness == '2' ~ '1',
+  mutate(cor.remote = case_when(task == "calendar" & itemtype == "deictic" & resp.remoteness == abs(correctR - 4) ~ '1',
                                 task == "timeline" & linenum == "1" & item == "lastbday" & between(distfrommid, -7, -3.5) ~ '1',
                                 task == "timeline" & linenum == "1" & item == "breakfast" & between(distfrommid, -3.5, 0) ~ '1',
                                 task == "timeline" & linenum == "1" & item == "dinner" & between(distfrommid, 0, 3.5) ~ '1', 
@@ -333,7 +333,7 @@ E <- ggplot(calhist.e, aes(x=response1)) +
   facet_grid(item ~ agebin)
 
 G <- ggplot(calhist.g, aes(x=response1)) +
-  geom_histogram(fille="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  geom_histogram(fill="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
   xlab("square placement") +
   ggtitle("German Speakers") +
   ylim(0, 40) +
@@ -850,6 +850,7 @@ English.testv <- Cal.v2e %>%
   add_significance()
 English.testv
 
+# maybe not enough data to run this? many more NAs in German data compared to English data
 German.testv <- Cal.v2g %>%
   group_by(agegroup) %>%
   pairwise_wilcox_test(formula = correct ~ item, p.adjust.method = "BH") %>%
@@ -894,7 +895,7 @@ verbal.sum3 <- d.all %>%
             correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
             countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
 
-deictic.sum <- Calvd.d %>%
+deictic.sum <- calv.d %>%
   filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
   group_by(language, agegroup, item) %>%
   summarize(correct.m.d = mean(cor.first, na.rm=T), # % who answered correctly
@@ -924,9 +925,14 @@ Cal.v3 <- d.all %>%
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
-verbal.deictic <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
+verbal.deictic <- glm(cor.remote ~ language + itemtype, family = binomial(link='logit'), data=cal.d) #run logistic regression
 summary(verbal.deictic)
 Anova(verbal.deictic)
+
+# add language to the model
+#verbalL.deictic <- glm(correct ~ itemtype + language, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
+#summary(verbalL.deictic)
+#Anova(verbalL.deictic)
 
 Calv.dg <- Cal.v3 %>% # filter out German participants only
   filter(language == "german")
@@ -938,7 +944,8 @@ German_VerbalQuestions
 
 German.test2 <- Calv.dg %>% # conduct Wilcox_test on German sample only
   group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH")
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
 German.test2
 
 Calv.de <- Cal.v3 %>% # filter out english participants only
@@ -959,7 +966,7 @@ English.test2
 
 ##use verbal Q's to predict deictic Q's performance [split kids by if they recited days of week or not]
 ```{r}
-Calv.d2 <- Calvd.d %>%
+Calv.d2 <- calv.d %>%
   filter(itemtype %in% c('verbal', 'deictic')) %>%
   select(subjid, agegroup, language, itemtype, item, correct)
 Calv.d2T  <- reshape(Calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
@@ -1022,32 +1029,73 @@ Anova(verbal.deictic4)
 ```
 
 ```{r}
-remote1 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
-summary(verbal.deictic)
-Anova(verbal.deictic)
+remote1 <- glm(cor.remote ~ language + item + scale(ageyears), family = binomial(link='logit'), data=cal.d)
+summary(remote1)
+Anova(remote1)
+
+
+English.remote <- Calv.de %>% # conduct Wilcox_test on English sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+English.remote
+
+German.remote <- Calv.dg %>% # conduct Wilcox_test on German sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+German.remote
+```
+# Plot Proportion Correct
+```{r}
+# first recode correct variable
+cal.e$correct_cat[cal.e$correct == 0] <- 'Incorrect'
+cal.e$correct_cat[cal.e$correct == 1] <- 'Correct'
+
+# calculate proportions (English Data)
+cal.eprop <- cal.e %>%
+  count(agegroup, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+as.data.frame(cal.eprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_e <- ggplot(data = cal.eprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) +
+  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (English Data)')
+prop_e
+
+# just another way to calculate proportions
+# cal_de_prop <- round(100*prop.table(table(cal.e$correct)), digits=0)
+# cal_de_prop <- as.data.frame(cal_de_prop)
+
+# first recode correct variable
+cal.g$correct_cat[cal.g$correct == 0] <- 'Incorrect'
+cal.g$correct_cat[cal.g$correct == 1] <- 'Correct'
+
+# calculate proportions (German Data)
+cal.gprop <- cal.g %>%
+  count(agegroup, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+cal.gprop <- as.data.frame(cal.gprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_g <- ggplot(data = cal.gprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) +
+  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (German Data)')
+prop_g
 ```
 
-#######################################completed analyses end here###################################################
 
-````{r}
-#create new data frame (verbal items only)
-#German data only
-#Calv.dg <- Calvd.d %>%
-  #filter(itemtype == "verbal", language == "german") %>%
-  #select (subjid, agegroup, item, correct, cor.first)
-# create a new variable that sums up the # of verbal items correct
-# transpose item (i.e., transform from long to wide format)
-#Calv.dgT  <- reshape(Calv.dg, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
-#Calv.dgT$verbal_score <-rowSums(Calv.dgT[,c("correct.beforetoday", "correct.yesterday")], na.rm = TRUE)
+#################################### completed analyses end here ###################################################
 
-#English data only
-#Calv.de <- Calvd.d %>%
-  #filter(itemtype == "verbal", language == "english") %>%
-  #select (subjid, agegroup, item, correct, cor.first)
-#Calv.deT  <- reshape(Calv.de, idvar = c("subjid", "agegroup"), timevar = "item", direction = "wide")
-#Calv.deT$verbal_score_corfirst <- rowSums(Calv.deT[,c("cor.first.beforetoday", "cor.first.yesterday")], na.rm = TRUE) 
-#Calv.deT$verbal_score <-rowSums(Calv.deT[,c("correct.beforetoday", "correct.yesterday")], na.rm = TRUE)
-```
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
             #sd.correct = sd(cor.first, na.rm=T),
