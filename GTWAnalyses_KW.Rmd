@@ -19,16 +19,15 @@ library(rstatix)
 library(car)
 library(coin)
 library(scales)  # for scale_y_continuous(label = percent)
-library(ggthemes)   # for scale_fill_few('medium')
-library('ztable')     # format tables for reporting
+library(psych) # for calculating ICC reliability check on timeline task
 ```
 
-######################################################## Read in the  Data ################################################################
+# Read in the  Data
 
 ```{r}
 d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
-  select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% #remove unnecessary columns
+  select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% # remove unnecessary columns
   mutate(language = 'german',
         linenum = ifelse(item=="lastyear", 3, linenum)) # there appears to be an error where this item was incorrectly attributed to line 4
 
@@ -51,10 +50,10 @@ d.g <- mutate(d.g, response = ifelse(itemtype %in% c('deictic', 'event') & is.na
                               ifelse(itemtype == 'verbal', response1, response2)))
 ```
 
-#################################################Some Data Management and wrangling#########################################################
+# Some Data Management and wrangling
 
 ```{r}
-#Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)#
+# Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)#
 d.all <- rbind(d.g, d.e) %>% 
   mutate(item = as.factor(item),
          item = recode_factor(item, 'morning ' = 'thismorning',
@@ -77,10 +76,12 @@ d.all$weekday <- ifelse(d.all$weekday == "1", 7, ifelse(d.all$weekday == "2", 1,
 d.all$weekday[d.all$weekday == "999"] <- NA # replace missing data with NA
 
 future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') # Code all future time words
+
+d.all$distfrommid <- d.all$distfrommid_c1 # _c1 and _c2 used for reliability coding/ICC but for main analyses use distfrommid to avoid confusion
 ```
 
 ```{r}
-#Code correct responses (to compare to 'correctr' variable)
+# Code correct responses (to compare to 'correctr' variable)
 d.all <- d.all %>%
   mutate(correctR = case_when(task == "calendar" & itemtype == "deictic" & item == "yesterday" ~ '3',
                               task == "calendar" & itemtype == "deictic" & item == "beforeyesterday" ~ '2',
@@ -135,7 +136,7 @@ check <- d.all %>%
   filter(matchR == 'NO')   ## 74 mismatches, mostly on verbal Q's, in other cases correctR seems to be correct
 ```
 
-Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
+# Exclusions, change format of variables from factors to numeric and vice versa, create new variables to code correct responses and deictic status of responses on both the calendar and timeline task
 ```{r}
 d.all <- d.all %>%
   filter(exclude==0) %>%
@@ -211,7 +212,7 @@ subs_counts <- subs %>%
   summarize(n())
 ```
 
-##################################################Calendar Task Analyses Begin Here##########################################################
+# Calendar Task Analyses Begin Here
 
 ```{r}
 calv.d <- d.all %>% 
@@ -1046,6 +1047,7 @@ German.remote <- Calv.dg %>% # conduct Wilcox_test on German sample only
   add_significance()
 German.remote
 ```
+
 # Plot Proportion Correct
 ```{r}
 # first recode correct variable
@@ -1092,9 +1094,19 @@ prop_g <- ggplot(data = cal.gprop,
        title = 'Proportions Correct by Age Group (German Data)')
 prop_g
 ```
+# timeline analyses begin here 
+```{r}
+# Timelines ask reliability check: one-way mixed consistency, single measure ICC
+# English sample only
 
 
-#################################### completed analyses end here ###################################################
+TimeLine_Reliability <- d.e %>%
+  select(distfrommid_c1, distfrommid_c2)
+as.numeric(TimeLine_Reliability$distfrommid_c2)
+ICC(TimeLine_Reliability)
+```
+
+#################################### completed analyses end here 
 
 #What are errors based on? distance from today?
 #first.m = mean(cor.first, na.rm=T),     # average # of participants who put item in right box on first try
