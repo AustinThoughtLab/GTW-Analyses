@@ -1106,6 +1106,11 @@ as.numeric(TimeLine_Reliability$distfrommid_c2)
 ICC(TimeLine_Reliability)
 ```
 
+```{r}
+# standardize distances from the midpoint (0) by dividing each raw distance y the maximum distanec at which any item was placed on that timeline.[this way distances will range from 0 to 1]
+```
+
+
 #################################### completed analyses end here 
 
 #What are errors based on? distance from today?
