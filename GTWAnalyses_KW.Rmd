@@ -156,7 +156,7 @@ d.all <- d.all %>%
                                  task=='calendar' & response > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response > correctR ~ 1, 
                                TRUE ~ 0), # "what day will it be yesterday/today/tomorrow etc. e.g., Wednesday would be coded as 3"
-         # create variable and code deictic status of the *first* sticker placement
+         # create variable and code deictic status of the *first* sticker placement and drawn location on the lineline
          resp.stat.1 = case_when(task=='timeline' & distfrommid > 0 ~ 1,
                                  task=='calendar' & response1 > 4 ~ 1,
                                  task=='verbal' & item == 'today' & response1 > correctR ~ 1, 
@@ -1106,6 +1106,10 @@ ICC(TimeLine_Reliability)
 ```
 
 ```{r}
+# subset timeline data
+d.all.timeline <- d.all %>%
+  subset(task == "timeline")
+
 # calculate maximum distance of each item placed on the timeline
 d.all.timeline %>%
   group_by(itemtype, item) %>%
@@ -1136,8 +1140,185 @@ d.all <- d.all %>%
 d.all %>%
   group_by(linenum) %>%
   summarize(minimum = min(distfrommid_std, na.rm = T), maximum = max(distfrommid_std, na.rm=T))
-
 ```
+
+```{r}
+# assess comprehension of the decitic status of time words on the timeline task only
+
+# calculate percentage of trials kids of each age group responded with correct deictic status for each timeline
+tl.sum <- d.all.timeline %>%
+  group_by(agegroup, linenum, language) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+
+English.tl.sum <- d.all.timeline %>%
+  subset(language == "english") %>%
+  group_by(agegroup, linenum) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+
+German.tl.sum <- d.all.timeline %>%
+  subset(language == "german") %>%
+  group_by(agegroup, linenum) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+```
+
+Plot correct status by timeline (for each language separately)
+```{r}
+EnglishStatus.tl <- ggplot(data=English.tl.sum, aes(x=agegroup, y=deictic.m, group=linenum, color=linenum)) +
+  geom_line(aes(color=linenum))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('English Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+EnglishStatus.tl
+
+GermanStatus.tl <-ggplot(data=German.tl.sum, aes(x=agegroup, y=deictic.m, group=linenum, color=linenum)) +
+  geom_line(aes(color=linenum))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab ('German Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+GermanStatus.tl
+
+CorrectStatus_timeline <- ggarrange(EnglishStatus.tl, GermanStatus.tl,
+                    ncol = 2, nrow = 1, common.legend = TRUE, legend = "top")
+CorrectStatus_timeline
+
+# ggsave(CorrectStatus_timeline, file="correctStatus_timeline.jpeg", width = 10, height = 5, dpi = 300)
+```
+```{r}
+# calculate percentage of trials kids of each age group responded with correct deictic status for each timeline type (deictic vs. event)
+
+tl.sum2 <- d.all.timeline %>%
+  group_by(agegroup, itemtype, language) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+
+English.tl.sum2 <- d.all.timeline %>%
+  subset(language == "english") %>%
+  group_by(agegroup, itemtype) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+
+German.tl.sum2 <- d.all.timeline %>%
+  subset(language == "german") %>%
+  group_by(agegroup, itemtype) %>%
+  summarize(n = n(),
+            deictic.m = (mean(stat.correct)), # who got correct status
+            deictic.sd = (sd(stat.correct)), # standard deviation
+            deictic.se = deictic.sd/sqrt(n), # calculate standard error
+            deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
+            deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
+```
+
+Plot correct status by item type (for each language separately)
+```{r}
+EnglishStatus.tl2 <- ggplot(data=English.tl.sum2, aes(x=agegroup, y=deictic.m, group=itemtype, color=itemtype)) +
+  geom_line(aes(color=itemtype))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('English Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+EnglishStatus.tl2
+
+GermanStatus.tl2 <-ggplot(data=German.tl.sum2, aes(x=agegroup, y=deictic.m, group=itemtype, color=itemtype)) +
+  geom_line(aes(color=itemtype))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab ('German Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+GermanStatus.tl2
+
+CorrectStatus_timeline2 <- ggarrange(EnglishStatus.tl2, GermanStatus.tl2,
+                    ncol = 2, nrow = 1, common.legend = TRUE, legend = "top")
+CorrectStatus_timeline2
+
+# ggsave(CorrectStatus_timeline, file="correctStatus_timeline.jpeg", width = 10, height = 5, dpi = 300)
+```
+```{r}
+# Analyze deictic status accuracy with a mixed ANOVA, with Timeline Type (Deictic vs. Event) as a within-subjects factor and Age (3 through 7 years) and language  (German vs. English) as between-subject factors. 
+```
+
+
+```{r}
+# need to wait on adult comparison data to test knowledge of remoteness
+# calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
+# tl.sum1 <- d.all.timeline %>%
+  # group_by(agegroup, linenum, language) %>%
+  # summarize(n = n(),
+            # remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            # remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            # remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            # remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            # remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+```
+
 
 
 #################################### completed analyses end here 
