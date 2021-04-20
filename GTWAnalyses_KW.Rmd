@@ -1175,8 +1175,14 @@ German.tl.sum <- d.all.timeline %>%
             deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
             deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
 ```
+# calculate average accuracy for all items' placement relative to "now" for each timeline and subject
+```{r}
+deictic_linenum <- d.all.timeline %>%
+  group_by(subjid, linenum) %>%
+  mutate(deictic.m = (mean(stat.correct))) # average correct status
+```
 
-Plot correct status by timeline (for each language separately)
+# Plot correct status by timeline (for each language separately)
 ```{r}
 EnglishStatus.tl <- ggplot(data=English.tl.sum, aes(x=agegroup, y=deictic.m, group=linenum, color=linenum)) +
   geom_line(aes(color=linenum))+
@@ -1254,6 +1260,13 @@ German.tl.sum2 <- d.all.timeline %>%
             deictic.lower = deictic.m - deictic.se, # calculate lower 95% CI
             deictic.upper = deictic.m + deictic.se) # calculate upper 95% CI
 ```
+# Calculate mean deictic status accuracy for each subject and each type of timeline (Deictic vs. Event). 
+```{r}
+deictic_itemtype <- d.all.timeline %>%
+  group_by(subjid, itemtype) %>%
+  mutate(deictic.m = (mean(stat.correct))) # average correct status
+```
+
 
 Plot correct status by item type (for each language separately)
 ```{r}
@@ -1302,7 +1315,45 @@ CorrectStatus_timeline2
 # ggsave(CorrectStatus_timeline, file="correctStatus_timeline.jpeg", width = 10, height = 5, dpi = 300)
 ```
 ```{r}
-# Analyze deictic status accuracy with a mixed ANOVA, with Timeline Type (Deictic vs. Event) as a within-subjects factor and Age (3 through 7 years) and language  (German vs. English) as between-subject factors. 
+# Analyze deictic status accuracy with a three-way mixed ANOVA, with item Type (Deictic vs. Event) as a within-subjects factor and Age (3 through 7 years) and language  (German vs. English) as between-subject factors. 
+
+deictic_itemtype %>%
+  group_by(itemtype, agegroup, language) %>%
+  get_summary_stats(deictic.m, type="mean_sd")
+
+# visualize the data
+deictic_bxp <- ggboxplot(
+  deictic_itemtype, x = "agegroup", y = "deictic.m",
+  color = "itemtype", palette = "jco",
+  facet.by = "language"
+)
+deictic_bxp
+
+# check for outliers
+deictic_itemtype %>%
+  group_by(agegroup, itemtype, language) %>%
+  identify_outliers(deictic.m) # looks like there are some extreme outliers - check with Katharine about this
+
+# check normality assumption (ask Katharine if we need to worry about this)
+
+deictic_itemtype %>%
+  group_by(agegroup, itemtype, language) %>%
+  shapiro_test(deictic.m)
+
+# re-number subjid variable
+#deictic_itemtype <- deictic_itemtype %>%
+  #mutate(num=group_indices_(deictic_itemtype, .dots =c('subjid')))
+
+# convert itemtype to factor length variable
+deictic_itemtype <- deictic_itemtype %>%
+  convert_as_factor(itemtype)
+
+
+deictic.aov <- anova_test(
+  data = deictic_itemtype, dv = deictic.m, wid = subjid, 
+  within = itemtype, between = c(agegroup, language)
+)
+get_anova_table(deictic.aov)
 ```
 
 
