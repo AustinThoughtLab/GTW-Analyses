@@ -1099,15 +1099,44 @@ prop_g
 # Timelines ask reliability check: one-way mixed consistency, single measure ICC
 # English sample only
 
-
 TimeLine_Reliability <- d.e %>%
   select(distfrommid_c1, distfrommid_c2)
-as.numeric(TimeLine_Reliability$distfrommid_c2)
+TimeLine_Reliability$distfrommid_c2<- as.numeric(TimeLine_Reliability$distfrommid_c2)
 ICC(TimeLine_Reliability)
 ```
 
 ```{r}
-# standardize distances from the midpoint (0) by dividing each raw distance y the maximum distanec at which any item was placed on that timeline.[this way distances will range from 0 to 1]
+# calculate maximum distance of each item placed on the timeline
+d.all.timeline %>%
+  group_by(itemtype, item) %>%
+  summarize(average = mean(distfrommid_c1, na.rm=T), minimum = min(distfrommid_c1, na.rm = T), maximum = max(distfrommid_c1, na.rm=T)) # oops found a few TL coding errors that need to be checked/re-coded
+
+# calculate maximum placement distance for each timeline
+d.all.timeline %>%
+  group_by(linenum) %>%
+  summarize(average = mean(distfrommid_c1, na.rm=T), minimum = min(distfrommid_c1, na.rm = T), maximum = max(distfrommid_c1, na.rm=T)) # oops found a few TL coding errors that need to be checked/re-coded
+
+# add maximum placements to dataframe
+d.all <- d.all %>%
+  mutate(dist_average = case_when(task == "timeline" & linenum == "1" ~ '7.4',
+                                  task == "timeline" & linenum == "2" ~ '13.9', # this value is impossible - CHECK
+                                  task == "timeline" & linenum == "3" ~ '12.0', # this value is impossible - CHECK
+                                  task == "timeline" & linenum == "4" ~ '7.2'))
+
+# translate dist-average into numeric variable
+d.all$dist_average <-as.numeric(d.all$dist_average)
+                                  
+# standardize distfrommid_c1 [raw distance/max distance on the given timeline] so that they range from -1 to 1
+# check with Katharine that this is the correct way to standardize
+d.all <- d.all %>%
+  group_by(linenum) %>%
+  mutate(distfrommid_std = (distfrommid_c1/dist_average))
+
+# check and make sure scores were standardized correctly (this might correct itself once the coding has been fixed)
+d.all %>%
+  group_by(linenum) %>%
+  summarize(minimum = min(distfrommid_std, na.rm = T), maximum = max(distfrommid_std, na.rm=T))
+
 ```
 
 
