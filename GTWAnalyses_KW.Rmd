@@ -196,10 +196,12 @@ d.all <- d.all %>%
                                 task == "timeline" & linenum == "4" & item == "beforeyesterday" & between(distfrommid, -7, -3.5) ~ '1',
                                 task == "timeline" & linenum == "4" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
                                 task == "timeline" & linenum == "4" & item == "tomorrow" & between(distfrommid, 0, 3.5) ~ '1',
-                                task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1'))
+                                task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1'),
+         cor.remote = case_when(cor.remote == NA ~ '0'),
+         cor.remote = as.numeric(cor.remote))
 
-d.all$cor.remote[is.na(d.all$cor.remote) == T] <- '0' # replace missing data with 0
-d.all$cor.remote <- as.numeric(d.all$cor.remote) # convert from character length to numeric variable
+# d.all$cor.remote[is.na(d.all$cor.remote) == T] <- '0' # replace missing data with 0
+# d.all$cor.remote <- as.numeric(d.all$cor.remote) # convert from character length to numeric variable
 ```
 
 Participant counts
@@ -797,10 +799,62 @@ English_daysofweek <- d.all %>%
 Cal.v <- d.all %>%
   filter(task=="calendar" & itemtype == 'verbal') %>% # filter only verbal calendar items %>%
   select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>% # make sure correctR is # accurately coded
-  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+  mutate(subjid = as.factor(subjid),
+         cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))
+         prox = as.factor(prox)
 
+#run model with age, item, and language group
+age.verbal4 <- glmer(correct ~ language*item*scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=Cal.v)
+summary(age.verbal4)
+Anova(age.verbal4, Type =3) # failed to converge
+
+age.verbal5 <- glmer(correct ~ language + item + scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=Cal.v)
+summary(age.verbal5)
+Anova(age.verbal5, Type =3) # failed to converge
+
+age.verbal6 <- glm(correct ~ language + item + scale(ageyears), family = binomial(link='logit'), data=Cal.v)
+summary(age.verbal6)
+Anova(age.verbal6, Type =3)
+
+# look at bargraph of proportion correct for each item to see what's going on (for each P how many trials did they get correct)
+
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum <- Cal.v %>%
+  filter(agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n)) #calculate standard error
+
+ggplot(data = verbal.sum, aes (x = agegroup, y = correct.m.v, fill = language)) +
+  geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  labs(x = "Age", title = ('Proportions Correct by Age Group')) +
+  facet_wrap(~item)
+```
+
+##########################BUCLD Abstract ANALYSES BEGIN HERE##########################
+
+```{r}
+# order measure from timeline task
+
+# compare deictic status performance on timeline and calendar task (omit verbal Qs)
+# is prop correct similar on the two tasks?
+
+# calendar task gives you remoteness 
+```
+
+
+
+
+
+
+
+
+
+
+`````` ## go back and fix all the analyses below this line ------
 #Cal.v$correct <- factor(Cal.v$correct) #tell r to use correct as a factor variable
 
 #age.verbal <- glm(correct ~ scale(ageyears), family = binomial(link='logit'), data=Cal.v)
@@ -1096,6 +1150,45 @@ prop_g <- ggplot(data = cal.gprop,
        title = 'Proportions Correct by Age Group (German Data)')
 prop_g
 ```
+# graph prop correct for each verbal question separately
+```{r}
+# calculate proportions (English Data)
+cal.eprop <- cal.e %>%
+  count(agegroup, item, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+as.data.frame(cal.eprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_e <- ggplot(data = cal.eprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) + # or =waiver() or NULL for the default labels computed by the transformation object
+  scale_fill_few('Medium', drop = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (English Data)') +
+  facet_wrap(~item)
+prop_e
+
+# calculate proportions (German Data)
+cal.gprop <- cal.g %>%
+  count(agegroup, item, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+cal.gprop <- as.data.frame(cal.gprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_g <- ggplot(data = cal.gprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) +
+  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (German Data)') +
+  facet_wrap(~item)
+prop_g
+```
+
+
+
 # timeline analyses begin here 
 ```{r}
 # Timelines ask reliability check: one-way mixed consistency, single measure ICC
