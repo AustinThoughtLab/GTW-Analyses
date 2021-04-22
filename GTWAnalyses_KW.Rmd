@@ -20,6 +20,7 @@ library(car)
 library(coin)
 library(scales)  # for scale_y_continuous(label = percent)
 library(psych) # for calculating ICC reliability check on timeline task
+library(ggthemes) # for scale_fill_few('medium')
 ```
 
 # Read in the  Data
@@ -917,7 +918,7 @@ sum.all.e <- sum.all %>%
 ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
 ##use verbal Q's to predict deictic Q's performance
 ```{r}
-#create new data frame
+# create new data frame
 target <- c("verbal", "deictic")
 Cal.v3 <- d.all %>%
   filter(task=="calendar" & itemtype == target) %>% # filter only calendar %>%
@@ -926,14 +927,14 @@ Cal.v3 <- d.all %>%
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
          prox = as.factor(prox))
 
-verbal.deictic <- glm(cor.remote ~ language + itemtype, family = binomial(link='logit'), data=cal.d) #run logistic regression
+verbal.deictic <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
 summary(verbal.deictic)
 Anova(verbal.deictic)
 
 # add language to the model
-#verbalL.deictic <- glm(correct ~ itemtype + language, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
-#summary(verbalL.deictic)
-#Anova(verbalL.deictic)
+verbalL.deictic2 <- glm(correct ~ itemtype + language, family = binomial(link='logit'), data=Cal.v3) #run logistic regression
+summary(verbalL.deictic2)
+Anova(verbalL.deictic2)
 
 Calv.dg <- Cal.v3 %>% # filter out German participants only
   filter(language == "german")
@@ -971,7 +972,7 @@ Calv.d2 <- calv.d %>%
   filter(itemtype %in% c('verbal', 'deictic')) %>%
   select(subjid, agegroup, language, itemtype, item, correct)
 Calv.d2T  <- reshape(Calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
-#create new variable to code whether child correctly recited the days of the week
+# create new variable to code whether child correctly recited the days of the week
 Calv.d2T <- Calv.d2T %>%
   mutate(daysofweek_cor = case_when(item.verbal == "daysofweek" & correct.verbal == '1' ~ '1',
                                   item.verbal == "daysofweek" & correct.verbal == '0' ~ '0'))
@@ -995,7 +996,7 @@ Calv.d3 <- Calv.d3 %>%
   mutate(language = language.verbal) %>% # recode language
   select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
 
-##For children who recited the days of the week, does performance on verbal Q's predict performance on deictic Q's?
+## For children who recited the days of the week, does performance on verbal Q's predict performance on deictic Q's?
 verbal.deictic2 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d3) #run logistic regression
 summary(verbal.deictic2)
 
@@ -1018,15 +1019,16 @@ Calv.d4 <- Calv.d4 %>%
   mutate(language = language.verbal) %>% # recode language
   select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
 
-##For children who did not recite the days of the week correctly, does performance on verbal Q's predict performance on deictic Q's?
-verbal.deictic3 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d4) #run logistic regression
+## For children who did not recite the days of the week correctly, does performance on verbal Q's predict performance on deictic Q's?
+verbal.deictic3 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d4) # run logistic regression
 summary(verbal.deictic3)
 
-##run model on all kids (regardless of whether they recited the days of the week correctly or not)
-Calv.d5 <- rbind(Calv.d3, Calv.d4)
-verbal.deictic4 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d5) #run logistic regression
-summary(verbal.deictic4)
-Anova(verbal.deictic4)
+## run model on all kids (regardless of whether they recited the days of the week correctly or not)
+# I think this model is redundant 
+#Calv.d5 <- rbind(Calv.d3, Calv.d4)
+#verbal.deictic4 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=Calv.d5) #run logistic regression
+#summary(verbal.deictic4)
+#Anova(verbal.deictic4)
 ```
 
 ```{r}
@@ -1064,8 +1066,8 @@ as.data.frame(cal.eprop) # strip tbl_df() properties to print
 prop_e <- ggplot(data = cal.eprop, 
                  aes (x = agegroup, y = prop, fill = correct_cat)) +
   geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
-  scale_y_continuous(labels = percent) +
-  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  scale_y_continuous(labels = percent) + # or =waiver() or NULL for the default labels computed by the transformation object
+  scale_fill_few('Medium', drop = FALSE) + # keeps levels if data is filtered
   labs(x = "Age", y = NULL, fill = 'Correct Placement',
        title = 'Proportions Correct by Age Group (English Data)')
 prop_e
@@ -1122,19 +1124,25 @@ d.all.timeline %>%
 
 # add maximum placements to dataframe
 d.all <- d.all %>%
-  mutate(dist_average = case_when(task == "timeline" & linenum == "1" ~ '7.4',
-                                  task == "timeline" & linenum == "2" ~ '13.9', # this value is impossible - CHECK
-                                  task == "timeline" & linenum == "3" ~ '12.0', # this value is impossible - CHECK
-                                  task == "timeline" & linenum == "4" ~ '7.2'))
+  mutate(dist_maxF = case_when(task == "timeline" & linenum == "1" ~ '7.4',
+                                task == "timeline" & linenum == "2" ~ '7.3',
+                                task == "timeline" & linenum == "3" ~ '7.5',
+                                task == "timeline" & linenum == "4" ~ '7.2'),
+         dist_maxP = case_when(task == "timeline" & linenum == "1" ~ '8.4', 
+                               task == "timeline" & linenum == "2" ~ '7.2',
+                               task == "timeline" & linenum == "3" ~ '7.3',
+                               task == "timeline" & linenum == "4" ~ '7.7'))
 
-# translate dist-average into numeric variable
-d.all$dist_average <-as.numeric(d.all$dist_average)
+# translate dist_max into numeric variable
+d.all$dist_maxF <-as.numeric(d.all$dist_maxF)
+d.all$dist_maxP <-as.numeric(d.all$dist_maxP)
                                   
 # standardize distfrommid_c1 [raw distance/max distance on the given timeline] so that they range from -1 to 1
 # check with Katharine that this is the correct way to standardize
 d.all <- d.all %>%
   group_by(linenum) %>%
-  mutate(distfrommid_std = (distfrommid_c1/dist_average))
+  mutate(distfrommid_std = case_when(task == "timeline" & distfrommid_c1 < 0 ~ (distfrommid_c1/dist_maxP),
+                                     task == "timeline" & distfrommid_c1 > 0 ~ (distfrommid_c1/dist_maxF)))
 
 # check and make sure scores were standardized correctly (this might correct itself once the coding has been fixed)
 d.all %>%
@@ -1348,10 +1356,17 @@ deictic_itemtype %>%
 deictic_itemtype <- deictic_itemtype %>%
   convert_as_factor(itemtype)
 
+#recode itemtype
+deictic_itemtype$itemtype2[deictic_itemtype$itemtype == 'event'] <- 1
+deictic_itemtype$itemtype2[deictic_itemtype$itemtype == 'deictic'] <- 2
+
+# convert itemtype2 to factor length variable
+deictic_itemtype <- deictic_itemtype %>%
+  convert_as_factor(itemtype2)
 
 deictic.aov <- anova_test(
   data = deictic_itemtype, dv = deictic.m, wid = subjid, 
-  within = itemtype, between = c(agegroup, language)
+  within = itemtype2, between = c(agegroup, language)
 )
 get_anova_table(deictic.aov)
 ```
