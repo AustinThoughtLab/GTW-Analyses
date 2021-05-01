@@ -67,18 +67,20 @@ d.all <- rbind(d.g, d.e) %>%
                                       'dayago' = 'yesterday',
                                       'onedayfromnow' = 'tomorrow',
                                       'thisevening' = 'tonight'),
+         weekday = as.factor(weekday),
+         weekday = recode_factor(weekday, '1' = '7',
+                                 '2' = '1',
+                                 '3' = '2',
+                                 '4' = '3',
+                                 '5' = '4',
+                                 '6' = '5',
+                                 '7' = '6'), # recode default weekday function in excel to match calendar task (e.g., 1-7)
+        distfrommid = distfrommid_c1, # _c1/_c2 for ICC but for main analyses use distfrommid to avoid confusion
         language = as.factor(language),
         itemnum = as.factor(itemnum),
         exclude = replace_na(exclude, 0))
 
-d.all$weekday <- ifelse(d.all$weekday == "1", 7, ifelse(d.all$weekday == "2", 1, ifelse(d.all$weekday == "3", 2, ifelse(d.all$weekday == "4", 3, ifelse(d.all$weekday == "5", 4, ifelse(d.all$weekday == "6", 5, ifelse(d.all$weekday == "7", 6, 999)))))))
-# weekday function in excel codes Sun-Sat as 1-7 so here I am re-coding so the variable levels match our calendar task (e.g., 1-7 from Mon-Sun)
-
-d.all$weekday[d.all$weekday == "999"] <- NA # replace missing data with NA
-
 future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') # Code all future time words
-
-d.all$distfrommid <- d.all$distfrommid_c1 # _c1 and _c2 used for reliability coding/ICC but for main analyses use distfrommid to avoid confusion
 ```
 
 ```{r}
@@ -797,12 +799,12 @@ English_daysofweek <- d.all %>%
 #does age or item predict children's performance on verbal questions?
 ```{r}
 Cal.v <- d.all %>%
-  filter(task=="calendar" & itemtype == 'verbal') %>% # filter only verbal calendar items %>%
-  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>% # make sure correctR is # accurately coded
+  filter(task=="calendar" & itemtype == 'verbal') %>% # filter only verbal calendar items
+  select(-order, -linenum, -linelength, -distfrommid, -correctr, -timelinefirst, -itemnum) %>%
   mutate(subjid = as.factor(subjid),
          cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox)
+         prox = as.factor(prox))
 
 #run model with age, item, and language group
 age.verbal4 <- glmer(correct ~ language*item*scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=Cal.v)
@@ -832,6 +834,14 @@ ggplot(data = verbal.sum, aes (x = agegroup, y = correct.m.v, fill = language)) 
   geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) + # or use position = 'dodge' for grouped bars
   labs(x = "Age", title = ('Proportions Correct by Age Group')) +
   facet_wrap(~item)
+
+# make stand alone graph for days of the week
+verbal.sum2 <- verbal.sum %>%
+  filter(item == "daysofweek")
+
+ggplot(data = verbal.sum2, aes(x=agegroup, y = correct.m.v, fill = language)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(x = "Age", y = "Proportion Correct")
 ```
 
 ##########################BUCLD Abstract ANALYSES BEGIN HERE##########################
