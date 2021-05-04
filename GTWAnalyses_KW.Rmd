@@ -255,8 +255,12 @@ cal.d2 <- d.all %>% # create new data frame and remove 3- and 7-year-olds
          prox = as.factor(prox))
 
 cal.sum <- cal.d2 %>% # summary of data frame excluding 3- and 7-year-olds
-  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
-  group_by(language, agegroup, item) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow")),
+         prox = case_when(item == 'beforeyesterday' ~ 'Distal Terms',
+                          item == 'aftertomorrow' ~ 'Distal Terms',
+                          item == 'yesterday' ~ 'Proximal Terms',
+                          item == 'tomorrow' ~ 'Proximal Terms')) %>%
+  group_by(language, agegroup, item, prox) %>%
   summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
             sd.correct = sd(cor.first, na.rm=T),
             n = n(),
@@ -500,6 +504,7 @@ Anova(d.lm.4g, Type=3) #main effect of age
 ```
 
 Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+
 ```{r}
 cal.lm1 <- glmer(cor.first ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
 summary(cal.lm1) 
@@ -551,6 +556,39 @@ German.test <- cal.g2 %>%
   pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
   add_significance()
 German.test
+
+#filter by language & remove 3 and 7-year-olds
+cal.d3 <- cal.d %>%
+  filter(agegroup %in% c('4','5','6')) %>%
+  droplevels() %>%
+  select(agegroup, item, cor.first, language, prox)
+  #mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+language.test <- cal.d3 %>%
+  group_by(agegroup, item) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.test
+
+language.test2 <- cal.d3 %>%
+  group_by(item) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.test2
+
+language.proxTest <- cal.d3 %>%
+  group_by(agegroup, prox) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.proxTest
+# 0 = distal, 1 = proximal
+
+# don't split it by age group
+language.proxTest2 <- cal.d3 %>%
+  group_by(prox) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.proxTest2
 ```
 
 
@@ -582,7 +620,18 @@ correctPlacements <- ggplot(data=cal.sum, aes(x=agegroup, y=first.m, group=langu
   ylab('prop correct') +
   ylim(0,1) +
   #geom_errorbar(aes(ymin=first.m-se.correct, ymax=first.m+se.correct), width=.2, position=position_dodge(.05)) +
-facet_wrap( ~ item, nrow=2) 
+facet_wrap( ~ item, nrow=2) + 
+theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 correctPlacements
 ggsave(correctPlacements, file= "CorrectFirstPlacements.jpeg", width = 10, height = 10, dpi = 300)
 
@@ -600,6 +649,48 @@ cal.sum$Term[cal.sum$item == 'tomorrow'] <- "tomorrow"
 cal.sum$Term[cal.sum$item == 'yesterday'] <- "yesterday"
 cal.sum$Term[cal.sum$item == 'beforeyesterday'] <- "before-yesterday"
 cal.sum$Term[cal.sum$item == 'aftertomorrow'] <- "after-tomorrow"
+
+# now make the same graph as a bar graph
+correctPlacementsBar <- ggplot(data=cal.sum, aes(x=agebin, y=first.m, fill=languagegroup)) +
+  geom_bar(stat = 'identity', position = 'dodge')+
+  ylab('Proportion Correct') +
+  xlab('') +
+  ylim(0,1) +
+facet_wrap( ~ prox, nrow=2) + 
+theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "right", legend.title = element_blank()) +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+correctPlacementsBar
+
+# now make the same graph as a bar graph collapsed across age
+correctPlacementsBar2 <- ggplot(data=cal.sum, aes(x=prox, y=first.m, fill=language)) +
+  geom_bar(stat = 'identity', position = 'dodge')+
+  ylab('Proportion Correct') +
+  xlab('') +
+  ylim(0,1) +
+  facet_wrap( ~ agebin, nrow=1) +
+theme_minimal(base_size = 18) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 18, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 18),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 18), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 18),
+        axis.text.x = element_text(family = "Times", color = "black", size = 18)) +
+          theme(legend.position = "right", legend.title = element_blank()) +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+correctPlacementsBar2
+
+ggsave(correctPlacementsBar2, file= "CorrectFirstPlacementsBar2.jpeg", width = 15, height = 5, dpi = 300)
 ```
 
 Plot correct first placements separately for each language group
@@ -804,7 +895,10 @@ Cal.v <- d.all %>%
   mutate(subjid = as.factor(subjid),
          cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
          prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
-         prox = as.factor(prox))
+         prox = as.factor(prox),
+         agebin = case_when(agegroup == '4' ~ 'Age 4',
+                            agegroup == '5' ~ 'Age 5',
+                            agegroup == '6' ~ 'Age 6'))
 
 #run model with age, item, and language group
 age.verbal4 <- glmer(correct ~ language*item*scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=Cal.v)
@@ -823,8 +917,8 @@ Anova(age.verbal6, Type =3)
 
 #calculate percentage of trials in which kids of each age group got verbal questions correct
 verbal.sum <- Cal.v %>%
-  filter(agegroup %in% c('4', '5', '6', '7')) %>%
-  group_by(language, agegroup, item) %>%
+  filter(agegroup %in% c('4', '5', '6')) %>%
+  group_by(language, agegroup, item, agebin) %>%
   summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
             sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
             n = n(),
@@ -839,9 +933,20 @@ ggplot(data = verbal.sum, aes (x = agegroup, y = correct.m.v, fill = language)) 
 verbal.sum2 <- verbal.sum %>%
   filter(item == "daysofweek")
 
-ggplot(data = verbal.sum2, aes(x=agegroup, y = correct.m.v, fill = language)) +
+ggplot(data = verbal.sum2, aes(x=agebin, y = correct.m.v, fill = language)) +
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(x = "Age", y = "Proportion Correct")
+  labs(x = "", y = "Proportion Correct") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "right", legend.title = element_blank()) +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
 ```
 
 ##########################BUCLD Abstract ANALYSES BEGIN HERE##########################
