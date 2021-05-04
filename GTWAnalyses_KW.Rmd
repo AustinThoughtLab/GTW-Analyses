@@ -486,33 +486,33 @@ cal.d <- cal.d %>%
 d.lm2 <- glmer(stat.correct.1 ~ prox*language.d*scale(ageyears) + (1+prox|subjid), family = 'binomial', data=cal.d) #FTC
 summary(d.lm2) 
 Anova(d.lm2, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
+
+
 ```
+
+
 ```{r}
 # suggestion from cogsci reviewer to rerun model without the random intercept for subjects (but keep random slope because glmer requires random effect term to be specified)
 
 # when we also use effect coded variables, the model appears to converge (I say appears bc boundary(singluar) fit = TRUE)
 
-d.lm3 <- glmer(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d) #FTC
-isSingular(d.lm3, tol = 1e-4)
-# True which means that some "dimensions" of the variance-covariance matrix have been estimated as exactly zero. [the random effects covariance matrices of the fitted model are singular which could mean that this is an overfitted model with poor power]
+d.lm3 <- glmer(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d)
+
 summary(d.lm3) 
 Anova(d.lm3, Type=3) #suggests there is a main effect of age, an interaction of age and item, but no main effects of language, item (yes prox/no prox)
 
+isSingular(d.lm3, tol=1e-04)
 #lme4 failed to estimate the by-participant varying
 #slopes
-```
+# True which means that some "dimensions" of the variance-covariance matrix have been estimated as exactly zero. [the random effects covariance matrices of the fitted model are singular which could mean that this is an overfitted model with poor power]
 
-Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term removed from the model]
-```{r}
-# remove interaction to interpret main effects
-d.lm4 <- glmer(stat.correct.1 ~ prox.ec + language.ec + scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d) 
-summary(d.lm4)
-Anova(d.lm4, Type=3) #main effect of age
+coef(d.lm3)
 
+# regular regression w/fixed effects only
+d.lm3.0 <- glm(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears), data=cal.d)
 
-#d.lm5 <- glmer(stat.correct.1 ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
-#summary(d.lm5)
-#Anova(d.lm5, Type=3) #main effect of age
+summary(d.lm3.0) 
+Anova(d.lm3.0, Type=3) 
 ```
 
 Does age or item predict successful placement of time words in the past vs. the future within each language group separately? [no interaction term]
@@ -545,33 +545,15 @@ German.testP <- cal.g %>%
   pairwise_wilcox_test(formula = stat.correct.1 ~ prox.ec, p.adjust.method = "BH") %>%
   add_significance()
 German.testP
-
-```
-
-Knowledge of deictic status on calendar task: Does age or temporal location (proximal vs. distal) predict successful placement of time words in the past vs. the future within each langauge group separately? [no interaction term]
-```{r}
-d.lm.7e <-  glmer(stat.correct.1 ~ prox.ec + scale(ageyears) + (0 + prox.ec|subjid), family='binomial', data=cal.e) 
-summary(d.lm.7e)
-Anova(d.lm.7e, Type=3) #main effect of age
-
-d.lm.7g <-  glmer(stat.correct.1 ~ prox.ec + scale(ageyears) + (0 + prox.ec|subjid), family='binomial', data=cal.g) 
-summary(d.lm.7g)
-Anova(d.lm.7g, Type=3) #main effect of age
 ```
 
 Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
-
 ```{r}
-cal.lm1 <- glmer(cor.first ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
+cal.lm1 <- glmer(cor.first ~ language.ec*prox.ec*scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d) 
+# boundary (singluar) fit: see ?isSingular
 summary(cal.lm1) 
 Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
-```
-
-Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term removed from the model]
-```{r}
-cal.lm2 <- glmer(cor.first ~ language + item + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
-summary(cal.lm2)
-Anova(cal.lm2, Type=3)
+isSingular(cal.lm1, tol = 1e-04)
 ```
 
 Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]

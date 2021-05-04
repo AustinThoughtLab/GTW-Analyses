@@ -133,7 +133,7 @@ d.e <- d.e %>%
          stat.correct.1 = ifelse(item.stat == resp.stat.1, 1, 0))
 
 
-# caculate correct remoteness
+# calculate correct remoteness (note that this measure of remoteness does not take DS into account. i.e., here we would count a placement of "tomorrow" in square 3 as correct)
 d.e <- d.e %>%
   # create a variable to quantify how far the rank/box placement was from 'today'
   mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ abs(response - 4))) %>% 
@@ -158,6 +158,31 @@ d.e <- d.e %>%
                                 TRUE ~ '0'),
          cor.remote = as.numeric(cor.remote))
 
+# calculate correct remoteness (taking DS into account. i.e., a placement of "tomorrow" only counts as correct if it is in square 5)
+#d.e <- d.e %>%
+  # create a variable to quantify how far the rank/box placement was from 'today'
+  #mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ response - 4)) %>% 
+  # create new variable to code if response remoteness was correct for all items on the calendar and timeline tasks
+  #mutate(cor.remote = case_when(task == "calendar" & itemtype == "deictic" & resp.remoteness == (correctR - 4) ~ '1',
+                                #task == "timeline" & linenum == "1" & item == "lastbday" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "1" & item == "breakfast" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "1" & item == "dinner" & between(distfrommid, 0, 3.5) ~ '1', 
+                                #task == "timeline" & linenum == "1" & item == "nextbday" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "lastweek" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "thismorning" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "tonight" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "tomorrow" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "lastyear" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "nextweek" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "nextyear" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "beforeyesterday" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "tomorrow" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1',
+                                #TRUE ~ '0'),
+         #cor.remote = as.numeric(cor.remote))
+
 # participant counts
 subs <- d.e %>%
   select(subjid, agegroup) %>%
@@ -180,6 +205,7 @@ cal.d2 <- cal.d %>%
 
 # summarize data including 3- and 7-year-olds
 cal.sum <- cal.d2 %>% 
+  filter(agegroup %in% c('4', '5', '6', '7')) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow")),
          agegroup = recode_factor(agegroup, '3' = 'Age 3',
                                 '4' = 'Age 4',
@@ -218,11 +244,17 @@ with(subset(Temp.PF2, agegroup=="6"), t.test(x=stat.correct.1, mu=.5))
 with(subset(Temp.PF2, agegroup=="7"), t.test(x=stat.correct.1, mu=.5))
 with(subset(Temp.PF2, agegroup %in% c("4", "5")), t.test(stat.correct.1 ~ agegroup, var.equal=T))
 
+#recode Item for Legend
+cal.sum$Item[cal.sum$item == 'tomorrow'] <- "tomorrow"
+cal.sum$Item[cal.sum$item == 'yesterday'] <- "yesterday"
+cal.sum$Item[cal.sum$item == 'beforeyesterday'] <- "the day before yesterday"
+cal.sum$Item[cal.sum$item == 'aftertomorrow'] <- "the day after tomorrow"
+
 # Plot correct deictic status on the calendar task
 correctStatus_cal <- ggplot(data=cal.sum, 
-                        aes(x=agegroup, y=deictic1.m, group = item, color=item)) +
+                        aes(x=agegroup, y=deictic1.m, group = Item, color=Item)) +
   #geom_line(aes(linetype=item)) +
-  geom_line(aes(color=item))+
+  geom_line(aes(color=Item))+
   #scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
   ylab('Proportion Correct') +
@@ -278,6 +310,7 @@ with(subset(Temp.PF3, agegroup %in% c("4", "5")), t.test(stat.correct ~ agegroup
 
 # summarize timeline deictic status knowledge
 timeline.sum <- d.e.T %>% 
+  filter(agegroup %in% c('4', '5', '6', '7')) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow")),
          agegroup = recode_factor(agegroup, '3' = 'Age 3',
                                   '4' = 'Age 4',
@@ -293,11 +326,17 @@ timeline.sum <- d.e.T %>%
             deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
             deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
 
+#recode Item for Legend
+timeline.sum$Item[timeline.sum$item == 'tomorrow'] <- "tomorrow"
+timeline.sum$Item[timeline.sum$item == 'yesterday'] <- "yesterday"
+timeline.sum$Item[timeline.sum$item == 'beforeyesterday'] <- "the day before yesterday"
+timeline.sum$Item[timeline.sum$item == 'aftertomorrow'] <- "the day after tomorrow"
+
 # Plot correct deictic status on the timeline
 correctStatus_time <- ggplot(data=timeline.sum, 
-                        aes(x=agegroup, y=deictic1.m, group = item, color=item)) +
+                        aes(x=agegroup, y=deictic1.m, group = Item, color=Item)) +
   #geom_line(aes(linetype=item)) +
-  geom_line(aes(color=item))+
+  geom_line(aes(color=Item))+
   #scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
   ylab('Proportion Correct') +
