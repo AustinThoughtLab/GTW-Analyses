@@ -10,17 +10,21 @@ output: html_document
 ```{r, echo = FALSE}
 library(tidyverse) # for reshaping data
 library(nloptr) # for calling lme4
-library(lme4)
+library(lme4) # for mixed effects modeling
 library(ggplot2) # plotting data
 library(reshape2)
 library(ggpubr)
 library(dplyr) # for data manipulation
 library(rstatix)
-library(car)
+library(car) # for anova function
+library(stats) # for regular regression glm and lm
 library(coin)
 library(scales)  # for scale_y_continuous(label = percent)
 library(psych) # for calculating ICC reliability check on timeline task
 library(ggthemes) # for scale_fill_few('medium')
+
+# to correctly run Type III tests, the way R codes factors has to be changed from its default
+options(contrasts = c("contr.sum", "contr.poly"))
 ```
 
 # Read in the  Data
@@ -465,8 +469,8 @@ Anova(d.lm1, Type=3) #suggests there is a main effect of age, but no main effect
 # R default is to "dummy" code: Reference level coded as zero; Others as 1
 # Sum or effect coding is more appropriate for Type III ANOVA: Levels coded so they sum to zero. If 2 levels, coded as -1 and 1 (BUT, R defaults to Type II so dummy coding should be fine here)
 
-#recode language (german = 1, english = -1) and prox (proximal = 1, distal = -1)
-
+# recode language (german = 1, english = -1) and prox (proximal = 1, distal = -1)
+# the relevel command can also be used to change this
 cal.d <- cal.d %>%
   mutate(language.ec = case_when(language == 'german' ~ '1',
                                    language == 'english' ~ '-1'),
@@ -486,8 +490,6 @@ cal.d <- cal.d %>%
 d.lm2 <- glmer(stat.correct.1 ~ prox*language.d*scale(ageyears) + (1+prox|subjid), family = 'binomial', data=cal.d) #FTC
 summary(d.lm2) 
 Anova(d.lm2, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
-
-
 ```
 
 
@@ -509,10 +511,18 @@ isSingular(d.lm3, tol=1e-04)
 coef(d.lm3)
 
 # regular regression w/fixed effects only
-d.lm3.0 <- glm(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears), data=cal.d)
-
+d.lm3.0 <- glm(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears), family = 'binomial', data=cal.d)
 summary(d.lm3.0) 
-Anova(d.lm3.0, Type=3) 
+cal.d$language = as.factor(cal.d$language)
+
+d.lm3.0.type3 <- Anova(d.lm3.0, type='III') 
+
+# specify contr.sum in R to use type III
+cal.d$language.ec = relevel(cal.d$language, ref="german")
+cal.d$prox.ec = relevel(cal.d$prox, ref = "1")
+contrasts(cal.d$prox.ec)= contr.sum
+contrasts(cal.d$language.ec) = contr.sum
+d.lm3.0.type3
 ```
 
 Does age or item predict successful placement of time words in the past vs. the future within each language group separately? [no interaction term]
@@ -554,6 +564,20 @@ cal.lm1 <- glmer(cor.first ~ language.ec*prox.ec*scale(ageyears) + (0 + prox.ec|
 summary(cal.lm1) 
 Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
 isSingular(cal.lm1, tol = 1e-04)
+
+
+# regular regression w/fixed effects only
+cal.lm1.0 <- glm(cor.first ~ prox.ec*language.ec*scale(ageyears), family = 'binomial', data=cal.d)
+summary(cal.lm1.0)
+
+cal.lm1.0.type3 <- Anova(cal.lm1.0, type='III') 
+
+# specify contr.sum in R to use type III
+cal.d$language.ec = relevel(cal.d$language, ref="german")
+cal.d$prox.ec = relevel(cal.d$prox, ref = "1")
+contrasts(cal.d$prox.ec)= contr.sum
+contrasts(cal.d$language.ec) = contr.sum
+cal.lm1.0.type3
 ```
 
 Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]
