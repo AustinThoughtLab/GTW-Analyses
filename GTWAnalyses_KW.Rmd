@@ -22,6 +22,7 @@ library(coin)
 library(scales)  # for scale_y_continuous(label = percent)
 library(psych) # for calculating ICC reliability check on timeline task
 library(ggthemes) # for scale_fill_few('medium')
+library(brms)
 
 # to correctly run Type III tests, the way R codes factors has to be changed from its default
 options(contrasts = c("contr.sum", "contr.poly"))
@@ -366,11 +367,14 @@ calhist.g <- calhist.g %>%
                           item == "aftertomorrow" & response1 ==  6 ~ "0",
                           item == "beforeyesterday" & response1 ==  2 ~ "0")) # create new variable for filling correct placement
 
+calhist.g$ColorBar[is.na(calhist.g$ColorBar) == T] <- '1' # replace missing data with 0
+
 calhist.e <- calhist.e %>%
   mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
                           item == "yesterday" & response1 ==  3 ~ "0",
                           item == "aftertomorrow" & response1 ==  6 ~ "0",
                           item == "beforeyesterday" & response1 ==  2 ~ "0"))
+calhist.e$ColorBar[is.na(calhist.e$ColorBar) == T] <- '1' # replace missing data with 0
 
 # recode Items for Facet Labels
 calhist.g$Term[calhist.g$item == 'tomorrow'] <- "tomorrow"
@@ -382,10 +386,12 @@ calhist.e$Term[calhist.e$item == 'yesterday'] <- "yesterday"
 calhist.e$Term[calhist.e$item == 'beforeyesterday'] <- "before-yesterday"
 calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
 
+cols <- c("0" = "red", "1" = "grey50")
+
 English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = ColorBar)) +
-  geom_bar(color = "black") +
-  scale_fill_brewer() +
-  # scale_fill_grey(start = 0, end = 0.9) +
+  geom_bar() +
+  #scale_fill_grey(end = 0.3, na.value = "grey50") +
+  scale_fill_manual(values = cols) +
   theme_minimal(base_size = 10) +
   facet_grid(Term~agebin) +
   xlab("Square Placement") +
@@ -413,12 +419,12 @@ English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = 
 English_SquarePlacements
 
 German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1), fill = ColorBar)) +
-  geom_bar(color = "black") +
-  scale_fill_brewer() +
+  geom_bar() +
+  scale_fill_manual(values = cols) +
   theme_minimal(base_size = 10) +
   facet_grid(Term~agebin) +
   xlab("Square Placement") +
-  ylab("") +
+  ylab("Participant Count") +
   ylim(0, 35) +
   ggtitle("German Speakers (n = 103)") +
   theme(plot.title=element_text(family = "Times", color = "black", size = 10, hjust = 0.5), 
@@ -457,13 +463,6 @@ cal.sum4 <- cal.d2 %>%
   mutate(freq = n/sum(n))
 ```
 
-Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
-```{r}
-d.lm1 <- glmer(stat.correct.1 ~ language*prox*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
-summary(d.lm1) 
-Anova(d.lm1, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
-```
-
 ```{r}
 # CogSci reviewer asked about our fixed effect coding (which is nonexistent up to this point). "Some kinds of effect coding shouldn’t be used when interactions are present (such as the treatment coding that is default in lmer() and glmer())" 
 # R default is to "dummy" code: Reference level coded as zero; Others as 1
@@ -473,20 +472,40 @@ Anova(d.lm1, Type=3) #suggests there is a main effect of age, but no main effect
 # the relevel command can also be used to change this
 cal.d <- cal.d %>%
   mutate(language.ec = case_when(language == 'german' ~ '1',
-                                   language == 'english' ~ '-1'),
+                                  language == 'english' ~ '-1'),
            prox.ec = case_when(prox == '1' ~'1',
                                prox == '0' ~ '-1'),
          language.d = case_when(language == 'german' ~ '1',
-                                language == 'english' ~ '0'))
-  cal.d$language.ec <- as.numeric(cal.d$language.ec)
-  cal.d$prox.ec <- as.numeric(cal.d$prox.ec)
-  cal.d$language.d <- as.numeric(cal.d$language.d)
+                                language == 'english' ~ '0'),
+         item.level = case_when(item == 'beforeyesterday' ~ '1',
+                                item == 'yesterday' ~ '2',
+                                item == 'tomorrow' ~ '3',
+                                item == 'aftertomorrow' ~ '4'))
+cal.d$language.ec <- as.numeric(cal.d$language.ec)
+cal.d$prox.ec <- as.numeric(cal.d$prox.ec)
+cal.d$language.d <- as.numeric(cal.d$language.d)
 
+
+# dummy code item
+cal.d$item_yesterday <- ifelse(cal.d$item.level=="2",1,0)
+cal.d$item_tomorrow <- ifelse(cal.d$item.level=="3",1,0)
+cal.d$item_after <- ifelse(cal.d$item.level=="4",1,0)
+```
+
+Calendar Task: does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
+```{r}
+d.lm1 <- glmer(stat.correct.1 ~ language*item*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) #FTC
+summary(d.lm1) 
+Anova(d.lm1, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
+
+#run it again with new effect coded variables
+d.lm1.0 <- glmer(stat.correct.1 ~ language.ec*item_yesterday*item_tomorrow*item_after*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
+summary(d.lm1.0) 
+Anova(d.lm1.0, Type=3) 
 ```
 
 ```{r}
 # it seems like (from Roman's slides) since we manipulate prox within-subjects, we should include this as a random slope e.g., prox|subjid
-
 d.lm2 <- glmer(stat.correct.1 ~ prox*language.d*scale(ageyears) + (1+prox|subjid), family = 'binomial', data=cal.d) #FTC
 summary(d.lm2) 
 Anova(d.lm2, Type=3) #suggests there is a main effect of age, but no main effects of language, item or interactions
@@ -498,7 +517,7 @@ Anova(d.lm2, Type=3) #suggests there is a main effect of age, but no main effect
 
 # when we also use effect coded variables, the model appears to converge (I say appears bc boundary(singluar) fit = TRUE)
 
-d.lm3 <- glmer(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d)
+d.lm3 <- glmer(cal.d.stat.correct.1 ~ cal.d.item_yesterday*cal.d.item_tomorrow*cal.d.item_after*cal.d.language.ec*scale(cal.d.ageyears) + (0 + cal.d.item.level +1|cal.d.subjid), family = 'binomial', data=regdata)
 
 summary(d.lm3) 
 Anova(d.lm3, Type=3) #suggests there is a main effect of age, an interaction of age and item, but no main effects of language, item (yes prox/no prox)
@@ -507,23 +526,31 @@ isSingular(d.lm3, tol=1e-04)
 #lme4 failed to estimate the by-participant varying
 #slopes
 # True which means that some "dimensions" of the variance-covariance matrix have been estimated as exactly zero. [the random effects covariance matrices of the fitted model are singular which could mean that this is an overfitted model with poor power]
-
 coef(d.lm3)
+```
 
-# regular regression w/fixed effects only
-d.lm3.0 <- glm(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears), family = 'binomial', data=cal.d)
+```{r}
+# do it the bayes way - like Mike Frank :-) 
+d.lm3.0 <- brm(stat.correct.1 ~ prox.ec*language.ec*scale(ageyears) + (prox.ec + 1|subjid), data=cal.d)
 summary(d.lm3.0) 
-cal.d$language = as.factor(cal.d$language)
+save(d.lm3.0, file = "mod_brm")
 
-d.lm3.0.type3 <- Anova(d.lm3.0, type='III') 
+summary(d.lm3.0, waic = TRUE)
+posterior_summary(d.lm3.0, pars = c("^b_", "^sd_", "sigma"), probs = c(0.025, 0.975))
+#estimates above are the log-odds scale. To interpret them more easily, we need to apply the inverse link function (i.e., the logit-inverse) 
+a <- fixef(d.lm3.0)[1]
+#now transform it back to the probability scale (equivalent to plogis(a))
+exp(a) / (1 + exp(a))
+```
+#d.lm3.0.type3 <- Anova(d.lm3.0, type='III') 
 
 # specify contr.sum in R to use type III
-cal.d$language.ec = relevel(cal.d$language, ref="german")
-cal.d$prox.ec = relevel(cal.d$prox, ref = "1")
-contrasts(cal.d$prox.ec)= contr.sum
-contrasts(cal.d$language.ec) = contr.sum
-d.lm3.0.type3
-```
+# cal.d$language.ec = relevel(cal.d$language, ref="german")
+# cal.d$prox.ec = relevel(cal.d$prox, ref = "1")
+# contrasts(cal.d$prox.ec)= contr.sum
+# contrasts(cal.d$language.ec) = contr.sum
+# d.lm3.0.type3
+
 
 Does age or item predict successful placement of time words in the past vs. the future within each language group separately? [no interaction term]
 ```{r}
@@ -579,6 +606,21 @@ contrasts(cal.d$prox.ec)= contr.sum
 contrasts(cal.d$language.ec) = contr.sum
 cal.lm1.0.type3
 ```
+
+Knowledge of precise meanings on calendar Task: does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+```{r}
+# item.stat: 1 - future, 0 - past
+cal.d <- cal.d %>%
+  mutate(item.stat.ec = case_when(item.stat == '1' ~'1',
+                               item.stat == '0' ~ '-1'))
+cal.d$item.stat.ec <- as.numeric(cal.d$item.stat.ec)
+
+cal.lm5 <- glmer(cor.first ~ language.ec*item.stat.ec*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
+summary(cal.lm5) 
+Anova(cal.lm5, Type=3) 
+
+```
+
 
 Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]
 ```{r}
