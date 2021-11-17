@@ -12,7 +12,7 @@ lib = c("tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr",
 ipak(lib)
 
 # Read in the  Data
-d.g <- read.csv('Child Data and Analyses/data_german.csv')
+d.g <- read.csv('german_12112019.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% # remove unnecessary columns
   mutate(language = 'german',
@@ -21,11 +21,12 @@ d.g <- d.g %>%
 d.g[d.g == "999"] <- NA # Note that 999 indicates missing data
 d.g[d.g == ""] <- NA # replace missing data and empty cells with NA
 
-d.e <- read.csv('Child Data and Analyses/data_austin.csv')
+d.e <- read.csv('data_austin.csv')
 d.e <- d.e %>%
   select(-ID,-dob, -dot, -agedays, -monolingual, -site, -rank, -covered, -comments, -experimenter) %>% # remove unnecessary columns
   mutate(language = 'english')
 d.a <- read.csv('TimelineData_All.csv', header=T) # read in adult timeline data
+#d.a <- d_a
 
 d.e[d.e == "999"] <- NA # Note that 999 indicates missing data
 d.e[d.e == ""] <- NA # replace missing data and empty cells with NA
