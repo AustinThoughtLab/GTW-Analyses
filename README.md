@@ -15,4 +15,5 @@ with the tasks. Once we're confident in the new 'correctR' variable, I'll remove
 
 Notes:
 *as of Dec 2020 the first day of the week named when asked to recite (e.g., Sunday or Monday) is not included in the data entry sheet [this may be useful down the road e.g., if we want to split kids by those who started counting days of the week with Monday vs. Sunday]
+
 *as of Feb 2022 the All_analyses_Script is outdated. Individual Calendar and Timeline analyses files are the most up-to-date
