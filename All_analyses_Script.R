@@ -1,5 +1,7 @@
-# ipak function: install and load multiple R packages.
-# check to see if packages are installed. Install them if they are not, then load them into the R session.
+#####Install packages#####
+
+#ipak function: install and load multiple R packages.
+#check to see if packages are installed. Install them if they are not, then load them into the R session.
 ipak <- function(pkg){
   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
   if (length(new.pkg)) 
@@ -7,7 +9,8 @@ ipak <- function(pkg){
   sapply(pkg, require, character.only = TRUE)
 }
 
-lib = c("tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr", "rstatix", "car", "stats", "coin", "scales", "psych", "ggthemes", "brms")
+#call packages
+lib = c("ordinal","gridExtra","MPDiR","tidyr","quickpsy","gmodels", "gplots","tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr", "rstatix", "car", "stats", "coin", "scales", "psych", "ggthemes", "brms")
 ipak(lib)
 
 # Read in the  Data
@@ -23,7 +26,7 @@ subs_counts <- subs %>%
   summarize(n())
 
 
-# Calendar Task Analyses Begin Here
+#####Calendar Task Analyses Begin Here#####
 calv.d <- d.all %>% 
   filter(task == "calendar" & itemtype %in% c('deictic', 'verbal')) %>% #include all calendar items (verbal Qs too)
   mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
@@ -103,7 +106,7 @@ cal.g <- cal.d %>%
 cal.d %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
-# Calendar task only: Frequency distribution of box placement for each time word
+## Frequency distribution of box placement for each time word
 calhist.e <- cal.d %>% #filter english speakers and create new data frame
   filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
@@ -295,14 +298,13 @@ German.testP <- cal.g %>%
   add_significance()
 German.testP
 
-#' Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
-## -------------------------------------------------------------------------------------------------
+#Knowledge of precise meanings on calendar Task: does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+
 cal.lm1 <- glmer(cor.first ~ language.ec*prox.ec*scale(ageyears) + (0 + prox.ec|subjid), family = 'binomial', data=cal.d) 
 # boundary (singluar) fit: see ?isSingular
 summary(cal.lm1) 
 Anova(cal.lm1, Type=3) # suggests there are effects of language, item, and ageyears with no interactions
 isSingular(cal.lm1, tol = 1e-04)
-
 
 # regular regression w/fixed effects only
 cal.lm1.0 <- glm(cor.first ~ prox.ec*language.ec*scale(ageyears), family = 'binomial', data=cal.d)
@@ -318,8 +320,7 @@ cal.lm1.0.type3 <- Anova(cal.lm1.0, type='III')
 #cal.lm1.0.type3
 
 
-#' Knowledge of precise meanings on calendar Task: does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
-## -------------------------------------------------------------------------------------------------
+# Knowledge of precise meanings on calendar Task: does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
 # item.stat: 1 - future, 0 - past
 cal.d <- cal.d %>%
   mutate(item.stat.ec = case_when(item.stat == '1' ~'1',
@@ -476,7 +477,7 @@ English_daysofweek <- d.all %>%
   group_by(correct, agegroup) %>%
   summarise(n())
 
-##########################COGSCI PAPER ANALYSES END HERE##########################
+# COGSCI PAPER ANALYSES END HERE
 
 # does age or item predict children's performance on verbal questions?
 Cal.v <- d.all %>%
@@ -579,7 +580,7 @@ ggplot(data = verbal.sum2, aes(x=agebin, y = correct.m.v, fill = language)) +
 #' ```
 #' 
 #' Wilcox_test for item level comparisons (correct) within each language group separately
-## -------------------------------------------------------------------------------------------------
+
 #filter by language 
 Cal.ve <- Cal.v %>%
   filter(language == 'english') %>%
@@ -608,7 +609,7 @@ German.testv <- Cal.vg %>%
 German.testv
 
 #' Calculate % of children who correctly answered verbal questions
-## -------------------------------------------------------------------------------------------------
+
 verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
 #calculate percentage of trials in which kids of each age group got verbal questions correct
@@ -662,10 +663,8 @@ sum.all.g <- sum.all %>%
 sum.all.e <- sum.all %>%
   filter(language == "english")
 
-#' 
-#' ##Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
-#' ##use verbal Q's to predict deictic Q's performance
-## -------------------------------------------------------------------------------------------------
+#Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
+##use verbal Q's to predict deictic Q's performance
 # create new data frame
 target <- c("verbal", "deictic")
 Cal.v3 <- d.all %>%
@@ -715,7 +714,7 @@ English.test2
 
 #' 
 #' ##use verbal Q's to predict deictic Q's performance; split kids by if they recited days of week or not]
-## -------------------------------------------------------------------------------------------------
+
 Calv.d2 <- calv.d %>%
   filter(itemtype %in% c('verbal', 'deictic')) %>%
   select(subjid, agegroup, language, itemtype, item, correct)
@@ -778,8 +777,7 @@ summary(verbal.deictic3)
 #summary(verbal.deictic4)
 #Anova(verbal.deictic4)
 
-#' 
-## -------------------------------------------------------------------------------------------------
+#
 remote1 <- glm(cor.remote ~ language + item + scale(ageyears), family = binomial(link='logit'), data=cal.d)
 summary(remote1)
 Anova(remote1)
@@ -797,9 +795,7 @@ German.remote <- Calv.dg %>% # conduct Wilcox_test on German sample only
   add_significance()
 German.remote
 
-#' 
-#' # Plot Proportion Correct
-## -------------------------------------------------------------------------------------------------
+# Plot Proportion Correct
 # first recode correct variable
 cal.e$correct_cat[cal.e$correct == 0] <- 'Incorrect'
 cal.e$correct_cat[cal.e$correct == 1] <- 'Correct'
@@ -844,8 +840,7 @@ prop_g <- ggplot(data = cal.gprop,
        title = 'Proportions Correct by Age Group (German Data)')
 prop_g
 
-#' # graph prop correct for each verbal question separately
-## -------------------------------------------------------------------------------------------------
+# graph prop correct for each verbal question separately
 # calculate proportions (English Data)
 cal.eprop <- cal.e %>%
   count(agegroup, item, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
@@ -880,10 +875,12 @@ prop_g <- ggplot(data = cal.gprop,
   facet_wrap(~item)
 prop_g
 
-# timeline analyses begin here 
+############ Timeline analyses begin here #############
 # Timelines ask reliability check: one-way mixed consistency, single measure ICC
 # English sample only
-
+d.e <- d.all %>%
+  filter(language == "english")
+  
 TimeLine_Reliability <- d.e %>%
   select(distfrommid_c1, distfrommid_c2)
 TimeLine_Reliability$distfrommid_c2<- as.numeric(TimeLine_Reliability$distfrommid_c2)
@@ -891,8 +888,10 @@ ICC(TimeLine_Reliability)
 
 # subset timeline data
 d.all.timeline <- d.all %>%
-  subset(task == "timeline" & agegroup %in% c("4", "5", "6", "7", "adult"))
-# adjust responses that were coded as being located excatly "now"
+  subset(task == "timeline" & agegroup %in% c("4", "5", "6", "7", "adult")) %>%
+  select(-distfrommid_c1, -distfrommid_c2, -response, -response1, -response2, -correctr, -correctR)
+
+# adjust responses that were coded as being located exactly "now"
 d.TL <- d.all.timeline %>%
   mutate(distfrommid2 = case_when(distfrommid == 0 ~ 0.01,
                                   distfrommid > 0 ~ distfrommid,
@@ -918,21 +917,20 @@ d.TL <- d.TL %>%
   ))
 
 # unload plyr for this next part
-detach("package:plyr", unload = TRUE)
+# detach("package:plyr", unload = TRUE)
 d.TL2 <- d.TL %>%
   group_by(SubjID, linenum) %>%
   mutate(Rank = dense_rank(distfrommid2))
 
 
 d.TL2$RankDif <- abs(d.TL2$CorrectRank - d.TL2$Rank)
-d.TL2$RankRight <- with(d.TL2, ifelse(RankDif=="0", 1, 0))
+d.TL2$Correct_Rank <- with(d.TL2, ifelse(RankDif=="0", 1, 0))
 
 d.TL2$item <- factor(d.TL2$item)
 #TempDistance indicates how far events should be from NOW -- 1 for more proximal events/times, 2 for more distal events/times
 d.TL2$TempDistance <- factor(with(d.TL2, ifelse(item %in% c("breakfast","dinner","thismorning","tonight","yesterday","tomorrow"), 1, 
                                                   ifelse(item %in% c("lastweek","nextweek","lastbday","nextbday","lastyear","nextyear", "beforeyesterday", "aftertomorrow"), 2,
                                                          "other"))))
-#### Trial Number ####
 #Now figure out the trialnumber and make it numeric
 d.TL2$TrialNum <- with(d.TL2,ifelse(order==1,
                                       match(item,c("breakfast","nextbday","dinner","lastbday","lastweek","tomorrow",
@@ -950,8 +948,8 @@ d.TL2$BNCorrect <- with(d.TL2,ifelse(item %in% c("breakfast", "lastbday", "lastw
 d.TL2$beforenow <- with(d.TL2, ifelse(distfrommid2 < 0, 1, 0))
 
 d.TL2$BNRight <- with(d.TL2, ifelse(BNCorrect == beforenow, 1 , 0))
-
 d.TL2$Past <- factor(d.TL2$BNCorrect)
+
 
 # calculate maximum distance of each item placed on the timeline
 #d.all.timeline %>%
@@ -967,10 +965,96 @@ colnames(d.TL2.max) <- c("SubjID","linenum","maxLineDist")
 
 d.TL3<- merge(d.TL2, d.TL2.max, by = c("SubjID", "linenum"))
 
-d.TL3$signedScaledDist <- d.TL3$distfrommid2/d.TL3$maxLineDist
-d.TL3$relOrd <- with(d.TL3, ifelse(Past == "1", abs(CorrectRank-3), CorrectRank-2))
+d.TL3$signedScaledDist <- d.TL3$distfrommid2/d.TL3$maxLineDist # divide each raw distance by the maximum distance an item was placed on the line
+d.TL3$relOrd <- with(d.TL3, ifelse(Past == "1", abs(CorrectRank-3), CorrectRank-2)) # i'm not sure I understand this line
 
-#### New remoteness measure ####
+
+#### Plot median timelines ####
+se <- function(x) sqrt(var(x) / length(x)) # function for calculating standard error
+
+library(plyr)
+median.lines <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + item + linenum, subset(d.TL3), median)
+median.lines$se <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + item + linenum, subset(d.TL3), se)$signedScaledDist
+median.lines$overallDeicticOrder <- as.ordered(as.character(mapvalues(median.lines$item, c("lastyear","lastweek","yesterday","thismorning","tonight","tomorrow","nextweek","nextyear"), c(1,2,3,4,5,6,7,8))))
+median.lines$deicticSize <- 12 + as.numeric(median.lines$overallDeicticOrder)
+median.lines$lineNames <- with(median.lines, ifelse(linenum==1, "Events", ifelse(linenum==2, "Deictic Terms 1","Deictic Terms 2")))
+median.lines$AgeYears = with(median.lines, factor(agegroup))
+
+timeline.endpoints2 <- ggplot(subset(median.lines, AgeYears %in% c(4,5,6,7,"adult")), 
+                              aes(x=AgeYears, y=signedScaledDist, group=item, color=Past, fill=Past)) + 
+  geom_ribbon(aes(ymin=signedScaledDist-se, ymax=signedScaledDist+se), alpha=.3) +
+  geom_path(size=2) + 
+  geom_point(aes(size=relOrd*3),size=8) +
+  geom_segment(aes(y=0, yend=0, x=.9, xend=1.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=1.9, xend=2.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=2.9, xend=3.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=3.9, xend=4.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=4.9, xend=5.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=5.9, xend=6.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=6.9, xend=7.1), linetype="solid", size=1, color="black") + 
+  geom_text(aes(label=item), color="black", size=6, angle=25, nudge_x = .35) + 
+  facet_wrap(~lineNames) +
+  scale_color_discrete(name='', labels=c("future","past")) + 
+  scale_fill_discrete(name='', labels=c("future","past")) + 
+  scale_y_continuous(name="median location", limits=c(-1.24,1.24), breaks=c(0), labels=c("")) + 
+  scale_x_discrete(name="age") + 
+  theme_bw() + 
+  theme(legend.position = "right",
+        panel.grid.major.y = element_line(size=2, color="darkgrey"),
+        panel.grid.major.x = element_line(size=0),
+        panel.grid.minor.x = element_line(size=0),
+        axis.text = element_text(size = rel(1.2)),
+        axis.title = element_text(size = rel(2)),
+        legend.text = element_text(size = rel(1.5)),
+        strip.text = element_text(size = rel(1.5), face="bold"),
+        strip.background = element_rect(fill = 'white', color="white"),
+        panel.background = element_rect(color="white"),
+        panel.border = element_blank(),
+        # panel.margin = unit(8, "lines"),
+        axis.line = element_line(size = 3, colour = "black"),
+        axis.ticks = element_blank()) +
+  coord_flip()
+timeline.endpoints2
+
+#### Analyses of ordinal rank ####
+#Sum for the entire line, to get an aggregate score of how much people diverged
+# from the correct ordering. (i.e. error score for each line)
+d.TL3$AgeYears <- as.factor(d.TL3$agegroup)
+d.TL4 <- aggregate(RankDif ~ linenum + SubjID + AgeYears + language + itemtype + item, d.TL3, sum)
+
+#Now average that error score across all the participant' timelines 
+d.TL5 <- aggregate(RankDif ~ itemtype +  AgeYears + language + SubjID, d.TL3, mean)
+d.TL5$itemtype <- factor(d.TL5$itemtype)
+
+# Anova of aggregate Rank error ####
+rank.agg <- subset(d.TL4)
+dim(rank.agg)
+RankError.aov <- aov(RankDif ~ AgeYears * itemtype + language + Error(SubjID/(itemtype)),rank.agg)
+summary(RankError.aov) #highly sig effect of age and language 
+
+aggregate(RankDif~itemtype, subset(d.TL4), mean)
+aggregate(RankDif~AgeYears + language, subset(d.TL4), mean)
+aggregate(RankDif~language, subset(d.TL4), mean)
+
+#linear regression of order error onto age (in years) English only 
+d.TL6 <- aggregate(RankDif ~ AgeYears + SubjID, subset(d.TL4, AgeYears != "adult" & language == "english"), mean)
+d.TL6$AgeYears <- as.numeric(as.character(d.TL6$AgeYears))
+Engrank.agg.lm <- lm(RankDif ~ AgeYears, subset(d.TL6))
+summary(Engrank.agg.lm) # age is highly significant
+
+#linear regression of order error onto age (in years) German only 
+d.TL7 <- aggregate(RankDif ~ AgeYears + SubjID, subset(d.TL4, AgeYears != "adult" & language == "german"), mean)
+d.TL7$AgeYears <- as.numeric(as.character(d.TL7$AgeYears))
+Germrank.agg.lm <- lm(RankDif ~ AgeYears, subset(d.TL7))
+summary(Germrank.agg.lm) # age is highly significant
+
+#linear regression of order error onto language 
+d.TL8 <- aggregate(RankDif ~ language + SubjID, subset(d.TL4, AgeYears != "adult"), mean)
+rank.agg.lm <- lm(RankDif ~ language, subset(d.TL8))
+summary(rank.agg.lm) # language is not significant
+
+
+#### New remoteness measure
 #### KW: some of this is redundant from the above but I'm figuring it out as I go :-) 
 # For each line and kid, regress the abs position relative to midpoint of each item onto mean adult placement
 # Then take R^2 as a scale-invariant error measure, for each kid and each line
@@ -1105,59 +1189,11 @@ German.tl.sum <- d.all.timeline %>%
 
 # calculate average accuracy for all items' placement relative to "now" for each timeline and subject
 
-#### Plot all median timelines ####
 
-d.TL4 <- d.TL3 %>%
-  filter(language == "english")
-library(plyr)
-library(plotrix)
-median.lines <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + item + linenum, subset(d.TL4), median)
-median.lines$se <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + item + linenum, subset(d.TL4), std.error)
-median.lines$overallDeicticOrder <- as.ordered(as.character(mapvalues(median.lines$item, c("lastbday", "lastyear", "lastweek","beforeyesterday","yesterday","thismorning","breakfast", "dinner", "tonight","tomorrow","aftertomorrow","nextweek","nextyear", "nextbday"), c(1,1,2,3,4,5,5,6,6,7,8,9,10,10))))
-median.lines$deicticSize <- 12 + as.numeric(median.lines$overallDeicticOrder)
-median.lines$NewItems <- with(median.lines, ifelse(item == "dinnertoday","dinner", ifelse(item=="breakfast today","breakfast",as.character(item))))
-median.lines$NewItemsNum <- with(median.lines, match(NewItems, c("lastweek","thismorning","tonight","tomorrow","lastyear","yesterday","nextweek","nextyear","lastbday","breakfast","dinner","nextbday")))
-median.lines$ItemName <- factor(with(median.lines, ifelse(agegroup =="adult", as.character(NewItems), "")))
 
-median.lines$lineNames <- with(median.lines, ifelse(linenum==1, "Events", ifelse(linenum==2, "Deictic Terms 1",ifelse(linenum==3, "Deictic Terms 2", "Deictic Terms 3"))))
-median.lines$AgeYears = with(median.lines, factor(agegroup, levels = rev(levels(agegroup))))
 
-timeline.endpoints2 <- ggplot(median.lines, 
-                              aes(x=agegroup, y=signedScaledDist, color=Past, fill=Past)) + 
-  geom_ribbon(aes(ymin=signedScaledDist, ymax=signedScaledDist), alpha=.3) +
-  geom_path(size=2) + 
-  geom_point(aes(size=relOrd*3),size=8) +
-  geom_segment(aes(y=0, yend=0, x=.9, xend=1.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=1.9, xend=2.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=2.9, xend=3.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=3.9, xend=4.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=4.9, xend=5.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=5.9, xend=6.1), linetype="solid", size=1, color="black") + 
-  geom_segment(aes(y=0, yend=0, x=6.9, xend=7.1), linetype="solid", size=1, color="black") + 
-  geom_text(aes(label=ItemName), color="black", size=6, angle=25, nudge_x = .35) + 
-  facet_wrap(~lineNames) +
-  scale_color_discrete(name='', labels=c("future","past")) + 
-  scale_fill_discrete(name='', labels=c("future","past")) + 
-  scale_y_continuous(name="median location", limits=c(-1.24,1.24), breaks=c(0), labels=c("")) +
-  theme_bw() + 
-  theme(legend.position = "right",
-        panel.grid.major.y = element_line(size=2, color="darkgrey"),
-        panel.grid.major.x = element_line(size=0),
-        panel.grid.minor.x = element_line(size=0),
-        axis.text = element_text(size = rel(1.2)),
-        axis.title = element_text(size = rel(2)),
-        legend.text = element_text(size = rel(1.5)),
-        strip.text = element_text(size = rel(1.5), face="bold"),
-        strip.background = element_rect(fill = 'white', color="white"),
-        panel.background = element_rect(color="white"),
-        panel.border = element_blank(),
-        panel.spacing = unit(1, "lines"),
-        #axis.line = element_line(size = 3, colour = "blue"),
-        axis.ticks = element_blank()) +
-  coord_flip()
-timeline.endpoints2
 
-#### Analysis of past/future assignment ####
+# Analysis of past/future assignment
 d.TL4$Age <- case_when(d.TL4$agegroup %in% c("4", "5", "6", "7") ~ d.TL4$agegroup,
                        d.TL4$agegroup == "adult" ~ "18")
 d.TL4$Age <- as.numeric(d.TL4$Age)
@@ -1260,7 +1296,7 @@ with(subset(d.TL4, item=='nextweek' & Age !='adult'), t.test(RankRight ~ order, 
 with(subset(d.TL4, item=='lastyear' & Age !='adult'), t.test(RankRight ~ order, var.equal=T)) # first in order 2
 
 
-# plot PastFuture accuracy over time  ####
+# plot PastFuture accuracy over time
 plot.data <- subset(d.TL4)
 plot.data.agg <- aggregate(BNRight ~ Age, plot.data, mean)
 plot.data.agg$varRank <- aggregate(BNRight ~ Age, plot.data, sd)$BNRight
@@ -1475,8 +1511,7 @@ tl.sum1 <- d.all.timeline %>%
 #'             #se.correct = sd.correct/sqrt(n),
 #'             #deictic.m = mean(stat.correct), # average #participants who got correct status
 #'             
-#' ###Did children place paired distal, proximal, past, and future items in the correct location? (e.g., correct placement for both tomorrow/after tomorrow)
-## -------------------------------------------------------------------------------------------------
+###Did children place paired distal, proximal, past, and future items in the correct location? (e.g., correct placement for both tomorrow/after tomorrow)
 #create new data frame
 cal.allT <- cal.d %>%
   select (subjid, agegroup, language, item, correct)

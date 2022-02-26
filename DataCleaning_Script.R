@@ -12,7 +12,7 @@ lib = c("tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr",
 ipak(lib)
 
 # Read in the  Data
-d.g <- read.csv('german_12112019.csv')
+d.g <- read.csv('german_data.csv')
 d.g <- d.g %>%      
   select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% # remove unnecessary columns
   mutate(language = 'german',
@@ -21,11 +21,11 @@ d.g <- d.g %>%
 d.g[d.g == "999"] <- NA # Note that 999 indicates missing data
 d.g[d.g == ""] <- NA # replace missing data and empty cells with NA
 
-d.e <- read.csv('data_austin.csv')
+d.e <- read.csv('english_data.csv')
 d.e <- d.e %>%
   select(-ID,-dob, -dot, -agedays, -monolingual, -site, -rank, -covered, -comments, -experimenter) %>% # remove unnecessary columns
   mutate(language = 'english')
-d.a <- read.csv('TimelineData_All.csv', header=T) # read in adult timeline data
+#d.a <- read.csv('TimelineData_All.csv', header=T) # read in adult timeline data
 #d.a <- d_a
 
 d.e[d.e == "999"] <- NA # Note that 999 indicates missing data
@@ -39,13 +39,13 @@ d.g <- mutate(d.g, response = ifelse(itemtype %in% c('deictic', 'event') & is.na
                               ifelse(itemtype == 'verbal', response1, response2)))
 
 # fill in non-overlapping columns with NAs
-d.a[setdiff(names(d.e), names(d.a))] <- NA
-d.e[setdiff(names(d.a), names(d.e))] <- NA
+#d.a[setdiff(names(d.e), names(d.a))] <- NA
+#d.e[setdiff(names(d.a), names(d.e))] <- NA
 d.g[setdiff(names(d.e), names(d.g))] <- NA
 
 # Some Data Management and wrangling
 # Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)#
-d.all <- rbind(d.g, d.e, d.a) %>% 
+d.all <- rbind(d.g, d.e) %>% 
   mutate(item = as.factor(item),
          item = recode_factor(item, 'morning ' = 'thismorning',
                                       'twodaysago' = 'beforeyesterday', 
@@ -162,27 +162,31 @@ d.all <- d.all %>%
 #' 4. calculate correct remoteness on timeline task: if response remoteness falls within appropriate numerical range------------------------------------------------------------------------------------
 d.all <- d.all %>%
   # create a variable to quantify how far the rank/box placement was from 'today'
-  mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ abs(response - 4))) %>% 
+  mutate(resp.remoteness = case_when(task == 'calendar' & itemtype == 'deictic' ~ abs(response - 4))) %>%
   # create new variable to code if response remoteness was correct for all items on the calendar and timeline tasks
   mutate(cor.remote = case_when(task == "calendar" & itemtype == "deictic" & resp.remoteness == abs(correctR - 4) ~ '1',
-                                task == "timeline" & linenum == "1" & item == "lastbday" & between(distfrommid, -7, -3.5) ~ '1',
-                                task == "timeline" & linenum == "1" & item == "breakfast" & between(distfrommid, -3.5, 0) ~ '1',
-                                task == "timeline" & linenum == "1" & item == "dinner" & between(distfrommid, 0, 3.5) ~ '1', 
-                                task == "timeline" & linenum == "1" & item == "nextbday" & between(distfrommid, 3.5, 7) ~ '1',
-                                task == "timeline" & linenum == "2" & item == "lastweek" & between(distfrommid, -7, -3.5) ~ '1',
-                                task == "timeline" & linenum == "2" & item == "thismorning" & between(distfrommid, -3.5, 0) ~ '1',
-                                task == "timeline" & linenum == "2" & item == "tonight" & between(distfrommid, 0, 3.5) ~ '1',
-                                task == "timeline" & linenum == "2" & item == "tomorrow" & between(distfrommid, 3.5, 7) ~ '1',
-                                task == "timeline" & linenum == "3" & item == "lastyear" & between(distfrommid, -7, -3.5) ~ '1',
-                                task == "timeline" & linenum == "3" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
-                                task == "timeline" & linenum == "3" & item == "nextweek" & between(distfrommid, 0, 3.5) ~ '1',
-                                task == "timeline" & linenum == "3" & item == "nextyear" & between(distfrommid, 3.5, 7) ~ '1',
-                                task == "timeline" & linenum == "4" & item == "beforeyesterday" & between(distfrommid, -7, -3.5) ~ '1',
-                                task == "timeline" & linenum == "4" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
-                                task == "timeline" & linenum == "4" & item == "tomorrow" & between(distfrommid, 0, 3.5) ~ '1',
-                                task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1'),
-         cor.remote = case_when(cor.remote == NA ~ '0'),
-         cor.remote = as.numeric(cor.remote))
+                                
+                                task == "calendar" & itemtype == "deictic" & resp.remoteness > abs(correctR - 4) ~ '0',
+                                task == "calendar" & itemtype == "deictic" & resp.remoteness < abs(correctR - 4) ~ '0',
+                                task == "calendar" & itemtype == "deictic" & resp.remoteness == NA ~ 'NA'))
+                                #task == "timeline" & linenum == "1" & item == "lastbday" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "1" & item == "breakfast" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "1" & item == "dinner" & between(distfrommid, 0, 3.5) ~ '1', 
+                                #task == "timeline" & linenum == "1" & item == "nextbday" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "lastweek" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "thismorning" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "tonight" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "2" & item == "tomorrow" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "lastyear" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "nextweek" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "3" & item == "nextyear" & between(distfrommid, 3.5, 7) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "beforeyesterday" & between(distfrommid, -7, -3.5) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "yesterday" & between(distfrommid, -3.5, 0) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "tomorrow" & between(distfrommid, 0, 3.5) ~ '1',
+                                #task == "timeline" & linenum == "4" & item == "aftertomorrow" & between(distfrommid, 3.5, 7) ~ '1')
+cal <- d.all %>%
+  filter(task == "calendar" & itemtype == "deictic")
 
 write.csv(d.all,"combinedData_cleaned.csv")
 
