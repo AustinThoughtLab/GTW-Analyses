@@ -1,0 +1,752 @@
+---
+title: "Calendar_Analyses"
+author: "KWilliams"
+date: "2/22/2022"
+output: html_document
+---
+
+```{r install packages, include=FALSE}
+#ipak function: install and load multiple R packages.
+#check to see if packages are installed. Install them if they are not, then load them into the R session.
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
+lib = c("ordinal","gridExtra","MPDiR","tidyr","quickpsy","gmodels", "gplots","tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr", "rstatix", "car", "stats", "coin", "scales", "psych", "ggthemes", "brms")
+ipak(lib) #run all packages stored in lib through the ipak function to call them
+```
+
+```{r data, echo=FALSE}
+d.all <- read.csv('combinedData_cleaned.csv')
+```
+
+```{r subset data and recode variables, echo=FALSE}
+calv.d <- d.all %>% 
+  filter(task == "calendar" & itemtype %in% c('deictic', 'verbal')) %>% #include all calendar items (verbal Qs too)
+  # filter(agegroup %in% c('4','5','6') & ageyears<7.0) %>% 
+  mutate(cor.first = ifelse(response1==correctR, 1, 0), # did they get it right on the first trial
+         prox = ifelse(item %in% c('yesterday','tomorrow'),1,0), # yesterday and tomorrow coded as proximal terms
+         prox = as.factor(prox))
+
+# default to bobo winter's approach
+## center continuous variables
+## sum code categorical variables (this is the conceptual analog of 'centering' for categorical predictors)
+
+# CogSci reviewer asked about our fixed effect coding (which is nonexistent up to this point). "Some kinds of effect coding shouldn’t be used when interactions are present (such as the treatment coding that is default in lmer() and glmer())" 
+# R default is to "dummy" code: Reference level coded as zero; Others as 1
+# Sum or effect coding is more appropriate for Type III ANOVA: Levels coded so they sum to zero. If 2 levels, coded as -1 and 1 (BUT, R defaults to Type II so dummy coding should be fine here)
+
+# sum code language and prox
+calv.d$language <- as.factor(calv.d$language)
+calv.d <- mutate(calv.d, language.sc = language)
+contrasts(calv.d$language.sc) <- contr.sum(2)
+calv.d$prox <- as.factor(calv.d$prox)
+calv.d <- mutate(calv.d, prox.sc = prox)
+contrasts(calv.d$prox.sc) <- contr.sum(2)
+calv.d$itemtype <- as.factor(calv.d$itemtype)
+calv.d <- mutate(calv.d, itemtype.sc = itemtype)
+contrasts(calv.d$itemtype.sc) <- contr.sum(2)
+
+calv.d <- calv.d %>%
+  mutate(item.level = case_when(item == 'beforeyesterday' ~ '1',
+                                item == 'yesterday' ~ '2',
+                                item == 'tomorrow' ~ '3',
+                                item == 'aftertomorrow' ~ '4'))
+
+# dummy code item
+calv.d$item_yesterday <- ifelse(calv.d$item.level==2,1,0)
+calv.d$item_tomorrow <- ifelse(calv.d$item.level==3,1,0)
+calv.d$item_after <- ifelse(calv.d$item.level==4,1,0)
+# duplicate columns
+calv.d <- calv.d %>%
+  mutate(item_yesterday.sc = factor(item_yesterday, levels = c(1, 0)),
+         item_tomorrow.sc = factor(item_tomorrow, levels = c(1, 0)),
+         item_after.sc = factor(item_after, levels = c(1, 0)),
+         item_stat.sc = factor(item.stat, levels = c(1,0))
+         )
+contrasts(calv.d$item_yesterday.sc) <- contr.sum(2)
+contrasts(calv.d$item_tomorrow.sc) <- contr.sum(2)
+contrasts(calv.d$item_after.sc) <- contr.sum(2)
+contrasts(calv.d$item_stat.sc) <- contr.sum(2)
+
+# center mean continuous variables
+# we do this in the model for age (in years)
+
+# subset dataframe
+
+cal.d <- calv.d %>% #create data frame that includes 3- to 7-year-olds
+  filter(task=="calendar" & itemtype=="deictic") %>% # only select deictic calendar items (leave verbal items out) 
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+cal.d2 <- calv.d %>% # create new data frame and remove 3- and 7-year-olds
+  filter(task=="calendar" & itemtype=="deictic" & agegroup %in% c('4','5','6') & ageyears<7.0) %>% # only select deictic items
+  droplevels() %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+  
+cal.e <- cal.d %>% # filter English speakers only and create new data frame
+  filter(language == "english") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+#remove 3 and 7-year-olds
+cal.e2 <- cal.e %>%
+  filter(agegroup %in% c('4','5','6')) %>%
+  droplevels()
+
+cal.g <- cal.d %>%
+  filter(language == "german") %>% # filter german speakers only and create new data frame
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+cal.g2 <- cal.g %>%
+  filter(agegroup %in% c('4','5','6')) %>%
+  droplevels()
+```
+
+```{r data summary}
+cal.sum <- cal.d %>% # summarize data including 3- and 7-year-olds
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% # for each word, how many kids got them right on the first try
+  group_by(language, agegroup, item) %>%
+  summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            rank.m = mean(correct), # right box (final answer)
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+
+cal.sum2 <- cal.d2 %>% # summary of data frame excluding 3- and 7-year-olds
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow")),
+         prox = case_when(item == 'beforeyesterday' ~ 'Distal Terms',
+                          item == 'aftertomorrow' ~ 'Distal Terms',
+                          item == 'yesterday' ~ 'Proximal Terms',
+                          item == 'tomorrow' ~ 'Proximal Terms')) %>%
+  group_by(language, agegroup, item, prox) %>%
+  summarize(first.m = mean(cor.first, na.rm=T), # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), # % who got correct status (first answer)
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            remoteness.m = mean(cor.remote), # % who got correct remoteness
+            rank.m = mean(correct), # % right box (final answer)
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+```
+
+```{r summarize knowledge of deictic status}
+# calculate percentage of trials kids of each age group responded with correct deictic status on calendar questions
+cal.sum3 <- cal.d %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            deictic1.m = (mean(stat.correct.1))*100, # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1))*100, # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+deictic.sum <- calv.d %>%
+  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.d = mean(cor.first, na.rm=T), # % who answered correctly
+            sd.correct.d = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct.d = sd.correct.d/sqrt(n),
+            deicticv.lower = correct.m.d - se.correct.d, # calculate lower 95% CI
+            deicticv.upper = correct.m.d + se.correct.d, # calculate upper 95% CI
+            countCorrect.d = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+```
+
+```{r summarize knowledge of remoteness}
+# calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
+cal.sum5 <- cal.d %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+
+remoteness.sum <- calv.d %>%
+  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+```
+
+```{r knowledge of precise meaning aka box placement}
+## Frequency distribution of box placement for each time word
+calhist.e <- cal.d %>% #filter english speakers and create new data frame
+  filter(language == "english" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+calhist.g <- cal.d %>% #filter German speakers and create new data frame
+  filter(language == "german" & agegroup %in% c('4','5','6') & ageyears<7.0) %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+calhist.e$agebin[calhist.e$agegroup == '4'] <- "Age 4"
+calhist.e$agebin[calhist.e$agegroup == '5'] <- "Age 5"
+calhist.e$agebin[calhist.e$agegroup == '6'] <- "Age 6"
+calhist.g$agebin[calhist.g$agegroup == '4'] <- "Age 4"
+calhist.g$agebin[calhist.g$agegroup == '5'] <- "Age 5"
+calhist.g$agebin[calhist.g$agegroup == '6'] <- "Age 6"
+
+all <- ggplot(cal.d, aes(x = response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 30) +
+  facet_grid(language ~ item ~ agegroup)
+all
+
+# Frequency distributions of first response only
+par(mfrow=c(1,1))
+E <- ggplot(calhist.e, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("square placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 40) +
+  theme_classic() +
+  facet_grid(item ~ agebin)
+
+G <- ggplot(calhist.g, aes(x=response1)) +
+  geom_histogram(fill="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("square placement") +
+  ggtitle("German Speakers") +
+  ylim(0, 40) +
+  theme_classic() +
+  facet_grid(item ~ agebin)
+
+histograms <- ggarrange(E, G, 
+                        ncol = 2, nrow = 1)
+#ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi = 300)
+
+calhist.g <- calhist.g %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                              item == "yesterday" & response1 ==  3 ~ "0",
+                              item == "aftertomorrow" & response1 ==  6 ~ "0",
+                              item == "beforeyesterday" & response1 ==  2 ~ "0")) # create new variable for filling correct placement
+
+calhist.g$ColorBar[is.na(calhist.g$ColorBar) == T] <- '1' # replace missing data with 0
+
+calhist.e <- calhist.e %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                              item == "yesterday" & response1 ==  3 ~ "0",
+                              item == "aftertomorrow" & response1 ==  6 ~ "0",
+                              item == "beforeyesterday" & response1 ==  2 ~ "0"))
+calhist.e$ColorBar[is.na(calhist.e$ColorBar) == T] <- '1' # replace missing data with 0
+
+# recode Items for Facet Labels
+calhist.g$Term[calhist.g$item == 'tomorrow'] <- "tomorrow"
+calhist.g$Term[calhist.g$item == 'yesterday'] <- "yesterday"
+calhist.g$Term[calhist.g$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.g$Term[calhist.g$item == 'aftertomorrow'] <- "after-tomorrow"
+calhist.e$Term[calhist.e$item == 'tomorrow'] <- "tomorrow"
+calhist.e$Term[calhist.e$item == 'yesterday'] <- "yesterday"
+calhist.e$Term[calhist.e$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
+
+cols <- c("0" = "red", "1" = "grey50")
+
+# Graph Correct First Placement (but show proportion of kids who placed sticker in each box)
+#exclude 3- and 7-year-olds from cal.sum4
+cal.sum4 <- cal.d2 %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>%
+  group_by(language, agegroup, item, response1) %>%
+  summarize(n = n()) %>%
+  mutate(freq = n/sum(n))
+```
+
+```{r predicting past/future placement w/ages 4-7}
+# does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
+
+# model with sum coded predictor variables
+d.lm1 <- glmer(stat.correct.1 ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+# once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
+summary(d.lm1) 
+Anova(d.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # only age is a significant predictor
+
+# it seems like (from Roman's slides) since we manipulate prox within-subjects, we should include this as a random slope e.g., prox|subjid
+#boundary (singular) fit: see ?isSingular
+#d.lm2 <- glmer(stat.correct.1 ~ prox.sc*language.sc*scale(ageyears) + (1+prox|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+#summary(d.lm2) 
+#Anova(d.lm2, Type=3) #suggests there is a main effect of age, but no main effects of language, proximity or interactions
+
+# suggestion from cogsci reviewer to rerun model without the random intercept for subjects (but keep random slope because glmer requires random effect term to be specified)
+# but we run into the same problem as above
+# boundary (singular) fit: see ?isSingular
+# It is very unusual to find data requiring a random slope but no random intercept, as it requires that all lines pass through the same point on the y axis.
+d.lm2 <- glmer(stat.correct.1 ~ prox.sc*language.sc*scale(ageyears) + (prox-1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+# boundary (singular) fit: see ?isSingular
+summary(d.lm2) 
+Anova(d.lm2, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # again only age is a significant predictor but there is an interaction of prox x age 
+
+# remove random slope
+d.lm3 <- glmer(stat.correct.1 ~ prox.sc*language.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+summary(d.lm3) 
+Anova(d.lm3, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) #suggests there is a main effect of age, but no main effects of language, proximity and only an interaction of prox x age 
+
+# Does age or item predict successful placement of time words in the past vs. the future within each language group separately?
+# english first
+d.lm4 <-  glmer(stat.correct.1 ~ prox.sc * scale(ageyears) + (1|subjid), family='binomial', data=cal.e2) 
+summary(d.lm4)
+Anova(d.lm4, Type=3) #main effect of age, sig interaction of prox + age
+
+#Wilcox_test for item level comparisons
+DeicticStatus_English <- cal.e %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = stat.correct.1 ~ prox.sc, p.adjust.method = "BH") %>%
+  add_significance()
+DeicticStatus_English # only sig difference between distal and proximal terms @ age 6 (p = .02)
+
+#german next
+d.lm5 <-  glmer(stat.correct.1 ~ prox.sc * scale(ageyears) + (1|subjid), family='binomial', data=cal.g2) 
+summary(d.lm5)
+Anova(d.lm5, Type=3) #main effect of age, no interaction
+
+DeicticStatus_German <- cal.g %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = stat.correct.1 ~ prox.sc, p.adjust.method = "BH") %>%
+  add_significance()
+DeicticStatus_German # sig difference at age 6 (p = .05)
+```
+
+```{r predicting correct remoteness placement w/ages 4-7}
+#does language spoken, item, or age (in years) predict successful placement of time words the correct # of squares from today? [interaction term included in the model]
+remote1 <- glm(cor.remote ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears), family = binomial(link = "logit"), data=cal.d2) # excludes 3- and 7-year-olds
+summary(remote1)
+Anova(remote1) # main effect of language, main effect of item (yesterday, tomorrow), main effect of age, but no interactions
+
+English.remote <- cal.e2 %>% # conduct Wilcox_test on English sample only
+  #group_by(agegroup) %>% # no sig differences when grouped by age
+  pairwise_wilcox_test(formula = cor.remote ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+English.remote # sig differences between before yesterday and yesterday/tomorrow across all ages and between after tomorrow and yesterday/tomorrow across all ages
+
+German.remote <- cal.g2 %>% # conduct Wilcox_test on German sample only
+  #group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.remote ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+German.remote # same findings as English above
+```
+
+```{r predicting precise meaning}
+# does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+
+# model with sum coded predictor variables
+p.lm1 <- glmer(cor.first ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+# once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
+summary(p.lm1) 
+Anova(p.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of language, item (yesterday, tomorrow), age, and sig 3-way interaction betweeen language x item x age 
+
+# Does language group, age, and temporal location (proximal vs. distal) predict correct placement? [interaction term included in the model]
+p.lm2 <- glmer(cor.first ~ language.sc*prox.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+summary(p.lm2) 
+Anova(p.lm2, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # suggests there are effects of language, proximity, and ageyears with no interactions
+
+# Does language group, age, and temporal location (proximal vs. distal) predict correct placement? [interaction term removed from the model]
+p.lm2.1 <-  glmer(cor.first ~ language.sc + prox.sc + scale(ageyears) + (1|subjid), family='binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+summary(p.lm2.1 )
+Anova(p.lm2.1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) #main effect of age, proximity, and language
+
+
+#does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
+p.lm3 <- glmer(cor.first ~ language.sc*item_stat.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2) 
+summary(p.lm3) 
+Anova(p.lm3, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of language, deictic status, and age but no interactions
+
+# remove interaction term
+p.lm3.0 <- glmer(cor.first ~ language.sc + item_stat.sc + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2) 
+summary(p.lm3.0) 
+Anova(p.lm3.0, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of language, deictic status, and age 
+
+# Does age or item predict successful placement of time words in the correct square on the first try within each language group separately? [no interaction term]
+p.lm4 <- glmer(cor.first ~ item_yesterday.sc*item_tomorrow.sc*item_after.sc + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.e2) 
+summary(p.lm4)
+Anova(p.lm4, Type=3) # main effect of item (yesterday, tomorrow, after tomorrow), and age, but no interactions
+
+#Wilcox_test for item level comparisons of cor.first by age (English-speakers only)
+PreciseMeaning_English <- cal.e2 %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+PreciseMeaning_English
+
+p.lm5 <- glmer(cor.first ~ item_yesterday.sc*item_tomorrow.sc*item_after.sc + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.g2) 
+summary(p.lm5)
+Anova(p.lm5, Type=3) # main effect of item (yesterday, tomorrow), and age, but no interactions
+
+#Wilcox_test for item level comparisons of cor.first by age (German-speakers only)
+PreciseMeaning_German <- cal.g2 %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+PreciseMeaning_German
+
+language.itemTest <- cal.d2 %>%
+  grouop_by(item) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.itemTest
+
+language.itemTestAge <- cal.d2 %>%
+  group_by(agegroup, item) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.test
+
+language.proxTest <- cal.d2 %>%
+  group_by(prox) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.proxTest
+
+language.proxTestAge <- cal.d2 %>%
+  group_by(agegroup, prox) %>%
+  pairwise_wilcox_test(formula = cor.first ~ language, p.adjust.method = "BH") %>%
+  add_significance()
+language.proxTestAge
+# 0 = distal, 1 = proximal
+```
+
+```{r verbal questions}
+verbal <- d.all %>%
+  filter(itemtype=="verbal" & agegroup %in% c('4','5') & item=="daysofweek") %>%
+  group_by(language, item) %>%
+  summarize(correct.m <- mean(correct))
+
+calv.dg <- calv.d %>% # filter out German participants only
+  filter(language == "german")
+German_VerbalQuestions <- ggplot(calv.dg, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+German_VerbalQuestions
+
+German.test2 <- calv.dg %>% # conduct Wilcox_test on German sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+German.test2
+
+calv.de <- calv.d %>% # filter out english participants only
+  filter(language == "english")
+English_VerbalQuestions <- ggplot(calv.de, aes(x = factor(correct))) +
+  geom_bar(color = "black") +
+  theme_minimal(base_size = 10) +
+  facet_grid(itemtype~agegroup)
+English_VerbalQuestions
+
+English.test2 <- calv.de %>% # conduct Wilcox_test on english sample only
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+English.test2
+
+# check percentage of participants (in each language group separately) that were able to correctly recite the days of the week
+daysofweek <- d.all %>%
+  select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
+  filter(item == "daysofweek")
+
+German_daysofweek <- d.all %>%
+  filter(language == "german", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+
+English_daysofweek <- d.all %>%
+  filter(language == "english", item == "daysofweek", exclude == "0") %>%
+  select(subjid, agegroup, correct) %>%
+  group_by(correct, agegroup) %>%
+  summarise(n())
+
+#' Calculate % of children who correctly answered verbal questions
+
+verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
+
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum1 <- d.all %>%
+  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(language, agegroup, item) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+verbal.sum2 <- d.all %>%
+  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(language, agegroup) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+verbal.sum3 <- d.all %>%
+  filter(itemtype == "verbal" & item == verbal_items) %>% #filter only 5 verbal questions
+  group_by(agegroup) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
+            correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
+            correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
+            countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
+# does age or item predict children's performance on verbal questions?
+#run model with age, item, and language group
+
+v.lm1 <- glmer(correct ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=calv.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+summary(v.lm1)
+Anova(v.lm1, Type =3) # only age in years significantly predicts correct response to verbal Q's
+
+
+```
+
+sum.all <- rbind(verbal.sum, deictic.sum) # combine data into one data frame
+sum.all.g <- sum.all %>%
+  filter(language == "german")
+sum.all.e <- sum.all %>%
+  filter(language == "english")
+
+  
+```{r comparing performance on verbal + deictic items}
+
+#Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
+##use verbal Q's to predict deictic Q's performance
+
+verbal.deictic <- glm(correct ~ itemtype.sc, family = binomial(link='logit'), data=calv.d) #run logistic regression
+summary(verbal.deictic)
+Anova(verbal.deictic)
+
+# add language to the model
+verbalL.deictic2 <- glm(correct ~ itemtype.sc + language.sc, family = binomial(link='logit'), data=calv.d) #run logistic regression
+summary(verbalL.deictic2)
+Anova(verbalL.deictic2)
+
+```
+
+```{r now split kids by correctr for daysoftheweek question}
+# use verbal Q's to predict deictic Q's performance; split kids by if they recited days of week or not]
+
+calv.d2 <- calv.d %>%
+  filter(itemtype %in% c('verbal', 'deictic')) %>%
+  select(subjid, agegroup, language, itemtype, item, correct)
+calv.d2T  <- reshape(calv.d2, idvar = c("subjid", "agegroup"), timevar = "itemtype", direction = "wide")
+
+# create new variable to code whether child correctly recited the days of the week
+calv.d2T <- calv.d2T %>%
+  mutate(daysofweek_cor = case_when(item.verbal == "daysofweek" & correct.verbal == '1' ~ '1',
+                                    item.verbal == "daysofweek" & correct.verbal == '0' ~ '0'))
+
+calv.d2T1 <- calv.d2T %>%
+  filter(daysofweek_cor == '1') %>% #select only kids who correctly recited the days of the week
+  select(-language.deictic)
+
+calv.d3 <- reshape(calv.d2T1, #transpose data back to long format
+                   direction = "long",
+                   varying = c("correct.verbal", "correct.deictic"), 
+                   v.names = c('correct'),
+                   timevar = "itemtype", #1 = verbal, 2 = deictic
+                   idvar = c("subjid", "agegroup"))
+
+calv.d3 <- calv.d3 %>%
+  mutate(item = case_when(itemtype == '1' ~ item.verbal, # recode new item variable
+                          itemtype == '2' ~ item.deictic)) %>%
+  mutate(itemtype = case_when(itemtype == '1' ~ 'verbal', # recode itemtype
+                              itemtype == '2' ~ 'deictic')) %>%
+  mutate(language = language.verbal) %>% # recode language
+  select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
+
+## For children who recited the days of the week, does performance on verbal Q's predict performance on deictic Q's?
+verbal.deictic3 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=calv.d3) #run logistic regression
+summary(verbal.deictic3)
+
+calv.d2T0 <- calv.d2T %>%
+  filter(daysofweek_cor == '0') %>% #select kids who did not correctly recite the days of the week
+  select(-language.deictic)
+
+calv.d4 <- reshape(calv.d2T0, #transpose data back to long format
+                   direction = "long",
+                   varying = c("correct.verbal", "correct.deictic"), 
+                   v.names = c('correct'),
+                   timevar = "itemtype", #1 = verbal, 2 = deictic
+                   idvar = c("subjid", "agegroup"))
+
+calv.d4 <- calv.d4 %>%
+  mutate(item = case_when(itemtype == '1' ~ item.verbal, # recode new item variable
+                          itemtype == '2' ~ item.deictic)) %>%
+  mutate(itemtype = case_when(itemtype == '1' ~ 'verbal', # recode itemtype
+                              itemtype == '2' ~ 'deictic')) %>%
+  mutate(language = language.verbal) %>% # recode language
+  select(-language.verbal, -item.verbal, -item.deictic) # remove duplicate columns
+
+## For children who did not recite the days of the week correctly, does performance on verbal Q's predict performance on deictic Q's?
+verbal.deictic4 <- glm(correct ~ itemtype, family = binomial(link='logit'), data=calv.d4) # run logistic regression
+summary(verbal.deictic4)
+```
+
+```{r graphing verbal questions}
+# look at bar graph of proportion correct for each item to see what's going on (for each P how many trials did they get correct)
+
+#calculate percentage of trials in which kids of each age group got verbal questions correct
+verbal.sum4 <- Cal.v %>%
+  filter(agegroup %in% c('4', '5', '6')) %>%
+  group_by(language, agegroup, item, agebin) %>%
+  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+            sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
+            n = n(),
+            se.correct.v = sd.correct.v/sqrt(n)) #calculate standard error
+
+ggplot(data = verbal.sum4, aes (x = agegroup, y = correct.m.v, fill = language)) +
+  geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  labs(x = "Age", title = ('Proportions Correct by Age Group')) +
+  facet_wrap(~item)
+
+# make stand alone graph for days of the week
+verbal.sum2 <- verbal.sum %>%
+  filter(item == "daysofweek")
+
+ggplot(data = verbal.sum2, aes(x=agebin, y = correct.m.v, fill = language)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(x = "", y = "Proportion Correct") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+  theme(legend.position = "right", legend.title = element_blank()) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+        #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))
+```
+
+```{r graphing placement of sticker on first try}
+#recode agegroup
+cal.sum$agebin[cal.sum$agegroup == "4"] <- "Age 4"
+cal.sum$agebin[cal.sum$agegroup == "5"] <- "Age 5"
+cal.sum$agebin[cal.sum$agegroup == "6"] <- "Age 6"
+
+#recode language spoken
+cal.sum$languagegroup[cal.sum$language == "english"] <- "English Speakers"
+cal.sum$languagegroup[cal.sum$language == "german"] <- "German Speakers"
+
+#recode Item for Legend
+cal.sum$Term[cal.sum$item == "tomorrow"] <- "tomorrow"
+cal.sum$Term[cal.sum$item == "yesterday"] <- "yesterday"
+cal.sum$Term[cal.sum$item == "beforeyesterday"] <- "before-yesterday"
+cal.sum$Term[cal.sum$item == "aftertomorrow"] <- "after-tomorrow"
+
+# create separate dataframes for each language group (for graphing) 
+Englishcal_sum <- cal.sum %>%
+  filter(language == "english")
+Germancal_sum <- cal.sum %>%
+  filter(language == "german")
+
+#exclude 3- and 7-year-olds from cal.sum (and collapse across language)
+cal.sum3 <- cal.d2 %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% #for each word, how many kids got them right on the first try
+  group_by(agegroup, item) %>%
+  summarize(first.m = mean(cor.first, na.rm=T),     # % who put item in right box on first try
+            sd.correct = sd(cor.first, na.rm=T),
+            n = n(),
+            se.correct = sd.correct/sqrt(n),
+            deictic1.m = mean(stat.correct.1), # who got correct status (first answer)
+            deictic.m = mean(stat.correct), # % who got correct status (final answer)
+            rank.m = mean(correct), # right box (final answer)
+            countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
+```
+
+```{r Plot Proportion Correct}
+# first recode correct variable
+cal.e$correct_cat[cal.e$correct == 0] <- 'Incorrect'
+cal.e$correct_cat[cal.e$correct == 1] <- 'Correct'
+
+# calculate proportions (English Data)
+cal.eprop <- cal.e %>%
+  count(agegroup, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+as.data.frame(cal.eprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_e <- ggplot(data = cal.eprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) + # or =waiver() or NULL for the default labels computed by the transformation object
+  scale_fill_few('Medium', drop = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (English Data)')
+prop_e
+
+# just another way to calculate proportions
+# cal_de_prop <- round(100*prop.table(table(cal.e$correct)), digits=0)
+# cal_de_prop <- as.data.frame(cal_de_prop)
+
+# first recode correct variable
+cal.g$correct_cat[cal.g$correct == 0] <- 'Incorrect'
+cal.g$correct_cat[cal.g$correct == 1] <- 'Correct'
+
+# calculate proportions (German Data)
+cal.gprop <- cal.g %>%
+  count(agegroup, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+cal.gprop <- as.data.frame(cal.gprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_g <- ggplot(data = cal.gprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) +
+  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (German Data)')
+prop_g
+
+# graph prop correct for each verbal question separately
+# calculate proportions (English Data)
+cal.eprop <- cal.e %>%
+  count(agegroup, item, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+as.data.frame(cal.eprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_e <- ggplot(data = cal.eprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) + # or =waiver() or NULL for the default labels computed by the transformation object
+  scale_fill_few('Medium', drop = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (English Data)') +
+  facet_wrap(~item)
+prop_e
+
+# calculate proportions (German Data)
+cal.gprop <- cal.g %>%
+  count(agegroup, item, correct_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+cal.gprop <- as.data.frame(cal.gprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_g <- ggplot(data = cal.gprop, 
+                 aes (x = agegroup, y = prop, fill = correct_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) +
+  #scale_fill_few('medium', drops = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Placement',
+       title = 'Proportions Correct by Age Group (German Data)') +
+  facet_wrap(~item)
+prop_g
+```
+
+
