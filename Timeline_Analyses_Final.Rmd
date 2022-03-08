@@ -1,0 +1,358 @@
+---
+title: "Timeline_Analyses_Final"
+author: "KWilliams"
+date: "2/23/2022"
+output: html_document
+---
+
+```{r install packages, include=FALSE}
+#ipak function: install and load multiple R packages.
+#check to see if packages are installed. Install them if they are not, then load them into the R session.
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
+lib = c("ordinal","gridExtra","MPDiR","tidyr","quickpsy","gmodels", "gplots","tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr", "rstatix", "car", "stats", "coin", "scales", "psych", "ggthemes", "brms")
+ipak(lib) #run all packages stored in lib through the ipak function to call them
+```
+
+```{r data, echo=FALSE}
+d.all <- read.csv('combinedData_cleaned.csv')
+```
+
+```{r timeline reliability check}
+# Timeline coding reliability check: one-way mixed consistency, single measure ICC
+# English only (no 2nd coding for german data)
+d.e <- d.all %>%
+  filter(language == "english")
+
+  
+TimeLine_Reliability <- d.e %>%
+  select(distfrommid_c1, distfrommid_c2)
+TimeLine_Reliability$distfrommid_c2<- as.numeric(TimeLine_Reliability$distfrommid_c2)
+ICC(TimeLine_Reliability) # excellent reliability 
+#ICC values less than 0.5 are indicative of poor reliability, values between 0.5 and 0.75 indicate moderate reliability, values between 0.75 and 0.9 indicate good reliability, and values greater than 0.90 indicate excellent reliability.
+```
+
+```{r data wrangling, subsetting, coding}
+# subset timeline data
+d.all.timeline <- d.all %>%
+  subset(task == "timeline") %>%
+  select(-distfrommid_c1, -distfrommid_c2, -response, -response1, -response2, -correctr, -correctR)
+
+# adjust responses that were coded as being located exactly "now"
+d.TL <- d.all.timeline %>%
+  mutate(distfrommid2 = case_when(distfrommid == 0 ~ 0.01,
+                                  distfrommid > 0 ~ distfrommid,
+                                  distfrommid < 0 ~ distfrommid))
+
+d.TL <- d.TL %>%
+  mutate(CorrectRank = case_when(linenum == 1 & item == "lastbday" ~ 1,
+                                 linenum == 1 & item == "breakfast" ~ 2, 
+                                 linenum == 1 & item == "dinner" ~ 3,
+                                 linenum == 1 & item == "nextbday" ~ 4,
+                                 linenum == 2 & item == "lastweek" ~ 1,
+                                 linenum == 2 & item == "thismorning" ~ 2,
+                                 linenum == 2 & item == "tonight" ~ 3,
+                                 linenum == 2 & item == "tomorrow" ~ 4,
+                                 linenum == 3 & item == "lastyear" ~ 1,
+                                 linenum == 3 & item == "yesterday" ~ 2,
+                                 linenum == 3 & item == "nextweek" ~ 3,
+                                 linenum == 3 & item == "nextyear" ~ 4,
+                                 linenum == 4 & item == "beforeyesterday" ~ 1,
+                                 linenum == 4 & item == "yesterday" ~ 2,
+                                 linenum == 4 & item == "tomorrow" ~ 3,
+                                 linenum == 4 & item == "aftertomorrow" ~ 4,
+  ))
+```
+
+```{r rank order error calculation}
+# if necessary, unload plyr for this next part
+#detach("package:plyr", unload = TRUE)
+d.TL2 <- d.TL %>%
+  group_by(subjid, linenum) %>%
+  mutate(Rank = dense_rank(distfrommid2))
+
+d.TL2$RankDif <- abs(d.TL2$CorrectRank - d.TL2$Rank)
+d.TL2$Correct_Rank <- with(d.TL2, ifelse(RankDif=="0", 1, 0))
+d.TL2$item <- factor(d.TL2$item)
+
+#Now figure out the trialnumber and make it numeric
+d.TL2$TrialNum <- with(d.TL2,ifelse(order==1,
+                                      match(item,c("breakfast","nextbday","dinner","lastbday","lastweek","tomorrow",
+                                                   "tonight","thismorning","nextweek","nextyear","yesterday","lastyear", 
+                                                   "yesterday","tomorrow", "aftertomorrow", "beforeyesterday")
+                                      ),
+                                      match(item,c("lastbday","dinner","nextbday","breakfast","thismorning","tonight",
+                                                   "tomorrow","lastweek","lastyear","yesterday","nextyear","nextweek", 
+                                                   "tomorrow", "yesterday", "beforeyesterday", "aftertomorrow")
+                                      )
+))
+d.TL2$TrialNum <- as.numeric(d.TL2$TrialNum)
+
+#Sum for the entire line, to get an aggregate score of how much people diverged (MAX = 8)
+# from the correct ordering. (i.e. error score for each line)
+d.TL2$AgeYears <- as.factor(d.TL2$agegroup)
+#d.TL3 <- d.TL2 %>%
+  #group_by(subjid, linenum) %>%
+  #mutate(sumRankDif = sum(RankDif, na.rm = T))
+
+#Now average that error score across all the participant' timelines 
+#d.TL4 <- d.TL3 %>%
+  #group_by(subjid) %>%
+  #mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+# now average error score across all participants by language 
+#d.TL6 <- d.TL3 %>%
+  #group_by(language) %>%
+ # mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+# now average for each item type: diectic vs. event
+#d.TL7 <- d.TL3 %>%
+  #group_by( itemtype) %>%
+  #mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+# now average error score across all participants by language and age
+#d.TL8 <- d.TL3 %>%
+  #group_by(language, AgeYears) %>%
+  #mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+#Now average that error score across all the participant' timelines  in each language
+d.TL9 <- d.TL2 %>%
+  group_by(language, AgeYears, itemtype, subjid) %>%
+  mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+#Anova of rank dif
+RankError.aov <- aov(RankDif ~ ageyears + itemtype + language, data = d.TL9)
+#RankError.aov <- aov(RankDif ~ AgeYears * itemtype + language + Error(subjid/(itemtype)),d.TL5)
+#RankError.aov <- aov(RankDif ~ AgeYears * itemtype + language + subjid,d.TL5)
+summary(RankError.aov) #highly sig effect of age and language
+
+#Anova of aggregate rank order
+RankError.aov <- aov(avgRankDif ~ ageyears + itemtype + language, data = d.TL9)
+#RankError.aov <- aov(RankDif ~ AgeYears * itemtype + language + Error(subjid/(itemtype)),d.TL5)
+#RankError.aov <- aov(RankDif ~ AgeYears * itemtype + language + subjid,d.TL5)
+summary(RankError.aov) #highly sig effect of age and language; doesn't matter if we use RankDif or AvgRankDif
+
+#linear regression of order error onto language 
+d.TL10 <- d.TL2 %>%
+  group_by(language, subjid) %>%
+  mutate(avgRankDif = mean(RankDif, na.rm = T))
+  
+rank.agg.lm <- lm(RankDif ~ language, d.TL10)
+summary(rank.agg.lm) # language is not significant
+
+#linear regression of order error onto age (in years) English only 
+d.TL12 <- d.TL3 %>%
+  filter(language == "english") %>%
+  group_by(AgeYears, subjid) %>%
+  mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+d.TL12$AgeYears <- as.numeric(as.character(d.TL12$AgeYears))
+Engrank.agg.lm <- lm(RankDif ~ AgeYears, d.TL12)
+summary(Engrank.agg.lm) # age is highly significant
+
+#linear regression of order error onto age (in years) German only 
+d.TL13 <- d.TL3 %>%
+  filter(language == "german") %>%
+  group_by(AgeYears, subjid) %>%
+  mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+d.TL13$AgeYears <- as.numeric(as.character(d.TL13$AgeYears))
+Germrank.agg.lm <- lm(RankDif ~ AgeYears, d.TL13)
+summary(Germrank.agg.lm) # age is highly significant
+
+```
+
+```{r analysis of ordinal rank -- t-test on mean accuracy-- }
+# t-tests by age of aggregate Rank error (mean accuracy) ####
+Temp.TL14 <- d.TL3 %>%
+  group_by(AgeYears, subjid, language) %>%
+  mutate(avgRankDif = mean(RankDif, na.rm = T))
+
+t.test(avgRankDif ~ language, var.equal = T, data = Temp.TL14) # difference in RankDif between language groups
+
+Temp.TL14Eng <- Temp.TL14 %>%
+  filter(language == 'english')
+Temp.TL14Ger <- Temp.TL14 %>%
+  filter(language == 'german')
+
+#with(subset(Temp.TL14, AgeYears %in% c("3")), t.test(RankDif, mu=5))
+#with(subset(Temp.TL14, AgeYears %in% c("4")), t.test(RankDif, mu = 5))
+#with(subset(Temp.TL14, AgeYears %in% c("5")), t.test(RankDif, mu = 5))
+#with(subset(Temp.TL14, AgeYears %in% c("6")), t.test(RankDif, mu = 5))
+#with(subset(Temp.TL14, AgeYears %in% c("7")), t.test(RankDif, mu = 5))
+
+with(subset(Temp.TL14Eng, AgeYears %in% c("4")), t.test(RankDif, mu=5))
+with(subset(Temp.TL14Ger, AgeYears %in% c("4")), t.test(RankDif, mu=5))
+
+with(subset(Temp.TL14Eng, AgeYears %in% c("5")), t.test(RankDif, mu=5))
+with(subset(Temp.TL14Ger, AgeYears %in% c("5")), t.test(RankDif, mu=5))
+
+with(subset(Temp.TL14Eng, AgeYears %in% c("6")), t.test(RankDif, mu=5))
+with(subset(Temp.TL14Ger, AgeYears %in% c("6")), t.test(RankDif, mu=5))
+
+with(subset(Temp.TL14Eng, AgeYears %in% c("7")), t.test(RankDif, mu=5))
+with(subset(Temp.TL14Ger, AgeYears %in% c("7")), t.test(RankDif, mu=5))
+
+#with(subset(Temp.TL14, AgeYears %in% c("3","4")), t.test(RankDif~AgeYears, var.equal=T))
+with(subset(Temp.TL14, AgeYears %in% c("4","5")), t.test(RankDif~AgeYears, var.equal=T))
+with(subset(Temp.TL14, AgeYears %in% c("5","6")), t.test(RankDif~AgeYears, var.equal=T))
+with(subset(Temp.TL14, AgeYears %in% c("6","7")), t.test(RankDif~AgeYears, var.equal=T))
+
+with(subset(Temp.TL14, AgeYears %in% c("6","adult")), t.test(RankDif~AgeYears, var.equal=T))
+with(subset(Temp.TL14Eng, AgeYears %in% c("7","adult")), t.test(RankDif~AgeYears, var.equal=T))
+with(subset(Temp.TL14Ger, AgeYears %in% c("7","adult")), t.test(RankDif~AgeYears, var.equal=T))
+```
+
+```{r code item proximity: proximal vs. distal}
+#TempDistance indicates how far events should be from NOW -- 1 for more proximal events/times, 2 for more distal events/times
+d.TL2$TempDistance <- factor(with(d.TL2, ifelse(item %in% c("breakfast","dinner","thismorning","tonight","yesterday","tomorrow"), 1, 
+                                                  ifelse(item %in% c("lastweek","nextweek","lastbday","nextbday","lastyear","nextyear", "beforeyesterday", "aftertomorrow"), 2,
+                                                         "other"))))
+```
+
+```{r code past/future placement}
+d.TL2$BNStatus <- with(d.TL2,ifelse(item %in% c("breakfast", "lastbday", "lastweek", "thismorning", "yesterday", "lastyear", "beforeyesterday"), 1, 0))
+d.TL2$BNResponse <- with(d.TL2, ifelse(distfrommid2 < 0, 1, 0))
+
+d.TL2$BNCorrect <- with(d.TL2, ifelse(BNStatus == BNResponse, 1 , 0))
+d.TL2$PastItem <- factor(d.TL2$BNStatus)
+
+# i still need to sum code these variables
+t.lm1 <- glmer(BNCorrect ~ language *itemtype*scale(ageyears) + (1|subjid), family = 'binomial', data=d.TL2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+# once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
+summary(t.lm1) 
+Anova(t.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # only age is a significant predictor
+
+
+#Wilcox_test for item level comparisons
+DeicticStatus_Timeline <- d.TL2 %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = BNCorrect ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+DeicticStatus_Timeline
+
+#Temp.PF.aov2 <- aov(BNCorrect ~ language + ageyears * itemtype,d.TL2)
+#summary(Temp.PF.aov2) #Effects of Age and itemtype
+
+BNSummaryScores <- aggregate(BNCorrect ~ agegroup + language, d.TL2, mean)
+BNSummaryScores2 <- aggregate(BNCorrect ~ agegroup + itemtype + language, d.TL2, mean)
+BNSummaryScores3 <- aggregate(BNCorrect ~ agegroup, d.TL2, mean)
+
+
+d.TL4 <- aggregate(BNCorrect ~ agegroup + ageyears + language + subjid, subset(d.TL2), mean)
+#with(subset(d.TL4, AgeYears=="3"), t.test(x=BNRight, mu=.5))
+with(subset(d.TL4, agegroup=="4"), t.test(x=BNCorrect, mu=.5)) # greater than chance
+with(subset(d.TL4, agegroup %in% c("6", "7")), t.test(BNCorrect ~ agegroup, var.equal=T)) # no difference
+with(subset(d.TL4, agegroup %in% c("6", "adult")), t.test(BNCorrect ~ agegroup, var.equal=T)) # 6-year-olds not adult-like
+with(subset(d.TL4, agegroup %in% c("7", "adult")), t.test(BNCorrect ~ agegroup, var.equal=T)) # 7-year-olds not adult-like 
+
+with(subset(d.TL4, agegroup == "4"), t.test(BNCorrect ~ language, var.equal = T)) # no difference at age 4 between English- and German-speakers 
+
+d.TL3 <- d.TL2 %>%
+  filter(agegroup != "adult") %>% # remove kids 
+  mutate(ageyears = as.numeric(ageyears))
+
+Temp.PF.m1 <- lm(BNCorrect ~ ageyears,d.TL3)
+summary(Temp.PF.m1) # age is a significant predictor of past/future placement on the timeline
+```
+
+```{r check for item order effects on past/future placement}
+# check for item order effects
+
+Time.TL4 <- aggregate(BNCorrect ~ ageyears + subjid + order + itemtype, d.TL2, mean)
+Time.TL5 <- aggregate(BNCorrect ~ ageyears + subjid + order + item, d.TL2, mean)
+
+Temp.PF.ord.aov <- aov(BNCorrect ~ ageyears * itemtype * order, d.TL2)
+summary(Temp.PF.ord.aov)  # effect of itemtype 
+
+Temp.PF.ord.d <- aov(BNCorrect ~ ageyears *  order, subset(d.TL2, itemtype=="deictic"))
+summary(Temp.PF.ord.d)   # main effect of age, no effect of order or interaction
+
+Temp.PF.ord.e <- aov(BNCorrect ~ ageyears *  order, subset(d.TL2, itemtype=="event"))
+summary(Temp.PF.ord.e) # main effect of age, no effect of order or interaction
+
+with(subset(Temp.PF6, Item=='BreakfastToday' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T))  # first in order 1
+with(subset(Temp.PF6, Item=='LastAge' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T))  # first in order 2
+with(subset(Temp.PF6, Item=='LastWeek' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T))  # first in order 1
+with(subset(Temp.PF6, Item=='ThisMorning' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T)) # first in order 2
+with(subset(Temp.PF6, Item=='NextWeek' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T)) # first in order 1 -- better when tested last vs first
+with(subset(Temp.PF6, Item=='LastYear' & AgeYears !='adult'), t.test(BNRight ~ Order, var.equal=T)) # first in order 2
+
+with(subset(Temp.TL, Item=='BreakfastToday' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T))  # first in order 1
+with(subset(Temp.TL, Item=='LastAge' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T))  # first in order 2; marginally better in order 2
+with(subset(Temp.TL, Item=='LastWeek' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T))  # first in order 1
+with(subset(Temp.TL, Item=='ThisMorning' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T)) # first in order 2
+with(subset(Temp.TL, Item=='NextWeek' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T)) # first in order 1 -- better when tested last vs first
+with(subset(Temp.TL, Item=='LastYear' & AgeYears !='adult'), t.test(RankRight ~ Order, var.equal=T)) # first in order 2
+
+```
+
+```{r plot median timeline placements}
+
+# calculate maximum placement distance for each timeline
+d.TL2.max <- aggregate(abs(distfrommid2) ~ subjid + linenum, d.TL2, max)
+colnames(d.TL2.max) <- c("subjid","linenum","maxLineDist")
+
+#d.TL2$subjid <- factor(d.TL2$subjid)
+
+d.TL5<- merge(d.TL2, d.TL2.max, by = c("subjid", "linenum")) %>%
+  mutate(Past = ifelse(item.stat == 0, "0", "1"))
+
+d.TL5$signedScaledDist <- d.TL5$distfrommid2/d.TL5$maxLineDist # divide each raw distance by the maximum distance an item was placed on the line
+d.TL5$relOrd <- with(d.TL5, ifelse(Past == "0", abs(CorrectRank-3), CorrectRank-2)) # i'm not sure I understand this line
+se <- function(x) sqrt(var(x) / length(x)) # function for calculating standard error
+
+library(plyr)
+median.lines <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + language + item + linenum, subset(d.TL5), median)
+median.lines$se <- aggregate(signedScaledDist ~ relOrd + Past + agegroup + language + item + linenum, subset(d.TL5), se)$signedScaledDist
+median.lines$overallDeicticOrder <- as.ordered(as.character(mapvalues(median.lines$item, c("lastyear","lastweek","yesterday","thismorning","tonight","tomorrow","nextweek","nextyear"), c(1,2,3,4,5,6,7,8))))
+median.lines$deicticSize <- 12 + as.numeric(median.lines$overallDeicticOrder)
+median.lines$lineNames <- with(median.lines, ifelse(linenum==1, "Events", ifelse(linenum==2, "Deictic Terms 1","Deictic Terms 2")))
+median.lines$AgeYears = with(median.lines, factor(agegroup))
+
+
+
+timeline.endpoints2.english <- ggplot(subset(median.lines, language %in% c("english")), 
+                              aes(x=AgeYears, y=signedScaledDist, group=item, color=Past, fill=Past)) + 
+  geom_ribbon(aes(ymin=signedScaledDist-se, ymax=signedScaledDist+se), alpha=.3) +
+  geom_path(size=2) + 
+  geom_point(aes(size=relOrd*3),size=8) +
+  geom_segment(aes(y=0, yend=0, x=.9, xend=1.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=1.9, xend=2.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=2.9, xend=3.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=3.9, xend=4.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=4.9, xend=5.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=5.9, xend=6.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=6.9, xend=7.1), linetype="solid", size=1, color="black") + 
+  geom_text(aes(label=item), color="black", size=6, angle=25, nudge_x = .35) + 
+  facet_wrap(~lineNames) +
+  scale_color_discrete(name='', labels=c("past","future")) + 
+  scale_fill_discrete(name='', labels=c("past","future")) + 
+  scale_y_continuous(name="median location", limits=c(-1.24,1.24), breaks=c(0), labels=c("")) + 
+  scale_x_discrete(name="age") + 
+  theme_bw() + 
+  theme(legend.position = "right",
+        panel.grid.major.y = element_line(size=2, color="darkgrey"),
+        panel.grid.major.x = element_line(size=0),
+        panel.grid.minor.x = element_line(size=0),
+        axis.text = element_text(size = rel(1.2)),
+        axis.title = element_text(size = rel(2)),
+        legend.text = element_text(size = rel(1.5)),
+        strip.text = element_text(size = rel(1.5), face="bold"),
+        strip.background = element_rect(fill = 'white', color="white"),
+        panel.background = element_rect(color="white"),
+        panel.border = element_blank(),
+        # panel.margin = unit(8, "lines"),
+        axis.line = element_line(size = 3, colour = "black"),
+        axis.ticks = element_blank()) +
+  coord_flip()
+timeline.endpoints2.english
+
+ggsave("meantimelineplacements_english.jpeg", width = 15, height = 20)
+```
+

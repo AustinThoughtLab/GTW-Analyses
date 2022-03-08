@@ -1,0 +1,253 @@
+---
+title             : "A crosslinguistic study of the acquisition of time words in English- and German-speaking children"
+shorttitle        : "GTW"
+
+author: 
+  - name          : "Katherine Williams"
+    affiliation   : "1"
+    address       : "Postal address"
+    email         : "kwilliams03@utexas.edu"
+    role:         # Contributorship roles (e.g., CRediT, https://casrai.org/credit/)
+      - Data Collection and Subject Recruitment
+      - Writing - Original Draft Preparation
+      - Writing - Review & Editing
+  - name          : "Anna Bánki"
+    affiliation   : "2"
+    role:
+      - Data Collection and Subject Recruitment
+      - Writing - Review & Editing
+  - name          : "Gabriela Markova"
+    affiliation   : "2"
+    role:
+      - Writing - Review & Editing
+  - name          : "Stefanie Hoehl"
+    affiliation   : "2"
+    role:
+      - Writing - Review & Editing
+  - name          : "Katharine Tillman"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    role:
+      - Conceptualization
+      - Writing - Original Draft Preparation
+      - Writing - Review & Editing
+
+affiliation:
+  - id            : "1"
+    institution   : "Department of Psychology, The University of Texas at Austin"
+  - id            : "2"
+    institution   : "Faculty of Psychology, The University of Vienna"
+
+authornote: |
+  Add complete departmental affiliations for each author here. Each new line herein must be indented, like this line.
+
+  Thank you to Cole Dougherty and Austin Thought Lab research assistants Shaurya Aggarwal, Alexis Belmares, Tayler Fennell, Bela Gadgil, Amal Hashmey, Christina Howell, Vanessa Jones, Tayler Macvillas, Beatrice Paksa, Michael Price, Kevin Shi, and Paige Wilson, and the Vienna Children's Studies research team, especially Josephine Funke, Andrea Morgenbesser, and Lea Halme  for their assistance with subject recruitment and data collection. We also want to thank the many children and families who participanted, without whom this research would not be possible.
+
+abstract: |
+  One or two sentences providing a **basic introduction** to the field,  comprehensible to a scientist in any discipline.
+  
+  Two to three sentences of **more detailed background**, comprehensible  to scientists in related disciplines.
+  
+  One sentence clearly stating the **general problem** being addressed by  this particular study.
+  
+  One sentence summarizing the main result (with the words "**here we show**" or their equivalent).
+  
+  Two or three sentences explaining what the **main result** reveals in direct comparison to what was thought to be the case previously, or how the  main result adds to previous knowledge.
+  
+  One or two sentences to put the results into a more **general context**.
+  
+  Two or three sentences to provide a **broader perspective**, readily comprehensible to a scientist in any discipline.
+  
+  <!-- https://tinyurl.com/ybremelq -->
+  
+keywords          : "cognitive development; temporal cognition; abstract concepts; cross-linguistic comparison; word learning"
+wordcount         : "X"
+
+bibliography      : ["references.bib", "r-references.bib"]
+
+floatsintext      : no # place figures and rables in the text rather than at the end
+figurelist        : no # create list of figure captions
+tablelist         : no # create list of table captions
+footnotelist      : no # create list of footnotes
+linenumbers       : yes # add linee numberes in the margins
+mask              : no # omit identifying information from the title pagee
+draft             : no # add "DRAFT" wateremark to every page
+
+documentclass     : "apa6"
+classoption       : "man"
+output            : papaja::apa6_word
+---
+
+```{r setup, include = FALSE}
+library("papaja")
+r_refs("r-references.bib")
+
+devtools::session_info()
+
+#ipak function: install and load multiple R packages.
+#check to see if packages are installed. Install them if they are not, then load them into the R session.
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
+lib = c("ordinal","gridExtra","MPDiR","tidyr","quickpsy","gmodels", "gplots","tidyverse", "nloptr", "lme4", "ggplot2", "reshape2", "ggpubr", "dplyr", "rstatix", "car", "stats", "coin", "scales", "psych", "ggthemes", "brms")
+ipak(lib) #run all packages stored in lib through the ipak function to call them
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(42)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed)
+```
+
+```{r read in the data}
+d.all <- read.csv('combinedData_cleaned.csv')
+```
+
+# Method
+
+## Participants
+```{r participant counts, echo = FALSE}
+# Participant counts
+d.all <- d.all %>%
+  mutate(sample = ifelse(agegroup == "adult", 'adult', 'child'))
+TotalN <- d.all %>%
+  select(subjid, sample, language) %>%
+  distinct
+TotalNCount <- TotalN %>%
+  group_by(language, sample) %>%
+  summarize(n())
+TotalNCount 
+
+subs <- d.all %>%
+  select(subjid, agegroup, language) %>%
+  group_by(agegroup, language) %>%
+  distinct
+subs_counts <- subs %>%
+  group_by(agegroup, language) %>%
+  summarize(n())
+subs_counts
+```
+We recruited English-speaking children (*N* = 128; 4 3-year-olds, 45 4-year-olds, 42 5-year-olds, 29 6-year-olds, 8 7-year-olds) and adults (*N* = 46) from the United States in Austin, Texas and German-speaking children (*N* = 125; 6 3-year-olds, 44 4-year-olds, 41 5-year-olds, 18 6-year-olds, 16 7-year-olds) and adults (*N* = 30) from Vienna Austria. Four additional English-speaking children were excluded due to experimenter error. Participants were tested in their native language by experimenters who were also native speakers. All study procedures were approved by the University's Institutional Review Board.
+
+## Material
+
+###Timeline Task
+Adapted from Tillman et al., (2017), the timeline task assesses children's understanding of the ordering and deictic status of deictic terms and temporal events (see Table 1). Study materials included a sheet of four continuous horizontal timelines with left and right endpoints and X different colored pencils. Each timelines stretched from the past on the left ("when you were a baby") to the future on the right ("when you are an adult"), and "right now" was indicated by a vertical line bisecting the midpoint. An icon of a baby was placed to the left of the timeline and an adult figure to the right (see Figure 1). Children were asked to indicate, with a different colored pencil mark, where temporal events and deictic terms should go on the line. Each timeline was associated with a pre-determined list of four items (Table 1) and children estimated the location of four items on each of the three timelines. To measure understanding of deictic status, we calculate the percentage of trials on which children correctly placed past items to the left of the midpoint and future items to the right. To asses understanding of relative order, we calculated the percentage of trials on which children placed the item on trial *N* on the correct side of the item on trial *N*-1, disregarding their location relative to the midpoint. See analysis section for more details. 
+
+**Table 1**
+Target items used in the timeline task. 
+
+Timeline | Item 1 | Item 2 | Item 3 | Item 4 
+------------- | ------------- | ------------- | ------------- | ------------- 
+Deictic 1 | last week | tomorrow | tonight | this morning 
+Deictic 2 | next week | next year | yesterday | last year
+Deictic 3 | tomorrow | yesterday | before yesterday | after tomorrow
+Event 1 | breakfast | next birthday |  dinner | last birthday
+
+Figure 1. Visual depiction of timeline task
+
+###Calendar Task
+The calendar task is a novel, discontinuous measure in which children's responses are constrained to individual squares with precise distances from *today*. Thus, children's knowledge of each target word's deictic status (e.g., that *yesterday* is in the past) and remoteness (e.g., that *yesterday* is exactly one day away from *today*) can be precisely measured and scored. Study materials included a sheet of eight rows of seven continguous squares (see Figure 1) and five colors of round label stickers. Each row of squares represents time extending three days in the past to three days in the future, from *today*. On each trial, participants are presented with a single row of squares and the experimenter and the child label each square with the days of the week (verbally from left-to-right, beginning with Monday). The experimenter places a sticker for *today* in the center (square 4), and the child is given a sticker to place in another square (e.g., "If this one is *today*, can you put the red sticker in the square for *tomorrow*). Different colored stickers were used for each target: yesterday/gestern, tomorrow/morgen, the day after tomorrow/übermorgen, and the day before yesterday/vorgestern. Each target word is tested on its own line, without visual access to prior sticker placements. The correct squares for before-yesterday,^[Throughout the methods and results we abbreviate the day before yesterday and the day after tomorrow to before-yesterday and after-tomorrow, respectively.] yesterday, tomorrow, and after-tomorrow were 2, 3, 5, and 6, respectively.
+
+Figure 2. Correct placement for A) *tomorrow* (red sticker) and B) *the day after tomorrow* (yellow sticker). On each trial, the orange sticker represents *today*, and participants select the placement for the target item, e.g., *tomorrow*
+
+```{r}
+knitr::include_graphics("Figure1.png")
+```
+
+## Procedure
+Children were tested one-on-one. The experimenter began the session by asking the child to recite the days of the week. Next, participants completed the timeline task and the calendar task (order was counterbalanced). For the Calendar task, the experimenter placed the first row of squares in front of the participant and labeled each square with the days of the week (verbally from left to right). Each trial of the calendar task began with an empty row of squares. The experimenter first placed the orange sticker in the center square to represent *today*, then gave the child a sticker to place in another square (e.g., "If this one is *today*, can you put the red sticker on the square for *tomorrow*). Children who did not place the sticker in the correct square on the first try were presented with a second row and a follow-up forced choice between the proximal and distal squares on the correct side of *today*, e.g., in the case of yesterday or the day before yesterday: Is it this one [square 3] or this one [square 2].^[These data are included in supplementary materials. All data reported in the Results reflect the child's initial sticker placement.] Trial order was counterbalanced. 
+
+For the timeline task, the experimenter placed the first timeline in front of the participant and described the timeline as showing "when different things happen," from the past, "when you were a baby", to the future, "when you're going to be a grown up", with the present represented in the middle. Children were asked to indicate, with a pencil mark, where each item goes on the line (e.g., "When did you eat breakfast today? Draw a line for when you ate breakfast today.") Participants always received the Events line first, followed by the three Deictic lines. For each line, half of the participants received the items in the order shown in Table 1, and the rest received the reverse order. 
+
+Finally children were asked to recite the days of the week, in order, along with five verbal forced-choice questions about the calendar system: "Which day comes after today, tomorrow or yesterday?", "Which day comes before today, tomorrow or yesterday?", "What day of the week is it today?", and "Today is [day of the week], what day of the week was it yesterday/will it be tomorrow?"
+
+## Coding and Analysis
+All verbal questions were coded as correct (1) or incorrect (0). We conducted mixed-effects logistic regressions using the lme4 package in *R* (Bates et al., 2015). We treat as a continuous, scaled variable in all models and include a random intercept for subjects; all fixed effects were effect coded with predictors centered around 0 [-1, 1]. We performed Wald chi-square tests from type-III analysis-of-variance tables using the car package (Fox & Weisberg, 2019) to determine whether models including each factor of interest provided a significantly better fit to the data than reduced models. 
+
+### Timeline task coding
+All analyses for the timeline were conducted using the distance from the midpoint (0) to each mark on the line. This value was used to determine the relative ordering of items along the timeline and whether the item was placed in the past (negative values) or the future (positive values). To assess children's knowledge of deictic status, we coded whether their response was located to the right or left of the midpoint. For example,  a response for *yesterday* was coded as correct (1) if it was to the left of the midpoint. Next, to assess if children have order knowledge of the terms, we coded whether their response was located to the left or right of their previous response on the same line. For example, a response for *yesterday* was coded as correct (1) if it was placed to the left of their response for *tomorrow*, disregarding their location relative to the midpoint
+
+### Calendar Task coding
+In the calendar task, each row of squares represented time extending three days in the past to three days in the future, from *today*. Recall that on each trial, the experimenter placed a sticker for *today* in the center (square 4). To assess children's knowledge of deictic status, we coded whether they correctly placed stickers to the right or left of *today*. For example, a sticker placement for *tomorrow* was coded as correct (1) if it was placed in any square 5-7 and incorrect (0) if it was placed in any square 1-3. To assess children's knowledge of remoteness, we coded whether they placed stickers the correct distance from *today* in either direction. For example, a sticker placement for *tomorrow* was coded as correct (1) if it was placed in square 3 or 5 and incorrect (0) if it was placed in squares 1-2 or 6-7. Finally, to assess if children have precise meanings for each term -- including both their deictic status and remoteness -- we coded whether they placed the corresponding sticker in the correct square on the calendar task. The correct squares for before-yesterday, yesterday, tomorrow, and after-tomorrow were 2, 3, 5, and 6, respectively. 
+
+
+```{r child = "Calendar_Analyses_Final.Rmd"}
+
+```
+
+```{r child = "Timeline_Analyses_Final.Rmd"}
+
+```
+We used `r cite_r("r-references.bib")` for all our analyses.
+
+
+# Results
+
+To investigate cross-linguistic differences in children's developing knowledge of time words, we conducted analyses on the timeline and calendar tasks separately. We first assessed comprehension of decitic status and sequential order of the deictic time words on the timeline task. We determined the typical ages of acquisition of these facets of meaning in English- and German-speakers separately to pinpoint the age at which the majority of children displayed adult-like comprehension of each facet of meaning, in each language. 
+
+## Facets of meaning on the timeline task
+
+### Knowledge of Deictic Status
+For each participant, we first calculated the average accuracy for all items' placement relative to "now" for each timeline. We next calculated a mean deictic status accuracy for each participate and each type of timeline (i.e.,  Deictic vs. Event). We then analyzed deictic status accuracy and considered whether language spoken (German vs. English), timeline type (event vs. deictic), and/or age predicted children's correct placement of terms in the past or future. There was a main effect of Timeline Type, χ2(1) = 9.5393, p = .002, and follow-up line comparisons within each age group using Wilcoxon signed-rank tests revealed that 6-year-olds  were more accurate on event timelines than deictic timelines. There was also a main effect of age, χ2(1) = 74.26, p < .001, suggesting that older children were more likely than younger children to represent the correct past/future status. The mean percentage of trials in which children correctly assigned items increased with age: XX% (95% CI [X,X]) for 3-year-olds, 59% (95% CI  [X, X]) for 4-year-olds, 69% (95% CI[X,X]) for 5-year-olds, 78% (95% CI[X,X]) for 6-year-olds, 83% (95% CI[X,X]) for 7-year-olds. Across both languages, 4-year-olds were better than chance, *t* = 4.77, *p* = < .001 while 3-year-olds did/did not <insert stats>. Seven-year-olds' performance was/was not indistinguishable from adults' < insert stats >. 
+
+**Table X**
+Deictic status accuracy at each age tested
+
+Agegroup | English-speakers | German-speakers 
+------------- | ------------- | ------------- 
+Age 3 | X | X
+Age 4 | 56% | 61.2%
+Age 5 | 79.5% | 68%
+Age 6 | 79.5% | 76.7%
+Age 7 | 86.7% | 81.3%
+
+### Knowledge of Relative Order 
+We next assessed knowledge of relative sequential order, separately from deictic status. To control for limitations in children's working memory, we compared the placement of each item relative to the placement of the immediately preceding item, rather than to the timeline as a whole (e.g., "If "last week" is tested just after "tomorrow," it should be placed to the left of "tomorrow"). This measure of pairwise order knowledge places minimal working memory demands on children, since they only need to recall the meaning of an immediately preceding item. We calculated mean accuracy on this 1-back measure of order knowledge, for each participant, language group, and Timeline Type. An ANOVA revealed a main effect of Age (*F*(4) = 1308.86, *p* < .001) and a main effect of language (*F*(1) = 583.76, *p* < .001). German-speakers were more accurate than English-speakers (*t* (5059) = 30.622, *p* < .001). Just as with deictic status, 4-year-olds in both language group performed significantly above chance (German: *t* (679) = -109.93, *p* < .001; English: *t*(711) = -111.76, *p* < .001), while 3-year-olds did/did not <insert stats>. Seven-year-olds' orderings were/were not indistinguishable from adults' < insert stats >.]
+
+Figure 3. Median placements of each item on the timeline.
+
+## Facets of meaning on the calendar task 
+Next, we assessed comprehension of deictic status and remoteness of the deictic time words on the calendar task. We determined the typical ages of acquisition of these facets of meaning in English- and German-speakers separately to pinpoint the age at which the majority of children displayed adult-like comprehension of each facet of meaning, in each language. The frequency distribution of children's sticker placements for each item is shown in Figure 4.
+
+Figure 4. Sticker placements by English- (45 4-year-olds, 42 5-year-olds, 29 6-year-olds) and German-speaking (44 4-year- olds, 41 5-year-olds, 18 6-year-olds) children for each item. Red bars indicate the correct placement.
+
+## Knowledge of Deictic Status
+To assess knowledge of decitic status, we asked whether items were correctly placed to the right or left of *today*. We first considered whether language spoken (German vs. English), item, and/or age predicted children's correct placement of terms in the past or future. The model revealed a main effect of age < 𝛽 = XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX >, but we did not fin a main effect of item < X^2 (X) = XX.X, *p* = .XXX> or language < stats>. Older children in both lanuages were more likely to correctly assign items to the past or future than yuonger children (see Figure 5). The mean percentage of trials in which children correctly assigned items increased with age: XX% (95% CI[XX.X, XX.X]) for 3-year-olds, XX% (95% CI[XX.X, XX.X]) for 4-year-olds, XX% (95% CI[XX.X, XX.X]) for 5-year-olds, XX% (95% CI[XX.X, XX.X]) for 6-year-olds, and XX% (95% CI[XX.X, XX.X]) for 7-year-olds. 
+
+Figure 5. Proportion of children (*N* =  XXX across language groups), who correctly placed items in the past or the future. 
+
+## Knowledge of Remoteness 
+Next, we evaluated knowledge of the temporal remoteness of each item - i.e., its relative distance from "now". 
+
+## Knowledge of Precise Meaning
+Finally, we assessed children's knowledge of the precise meaning of each term. To do this, we asked whether language (German vs. English), age, and/or item predicted children's correct placement. All three factors significantly improved the fit of the model: German speakers outperformed English speakers (𝛽 = XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); older children outperformed younger children (𝛽 = XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); and performance differed by item (X^2 (X) = XX.X, *p* < .XX).^[We did not fin evidence of an interaction; the model failed to converge when the interaction term was included. When random effects were removed from the model, all three factors still improved model fit and there was no evidence of an interaction] <include the model fits with the interaction>
+
+Follow-up item comparisons within each language group using Wilcoxon signed-rank tests revealed that 4-year-olds from both langauge groups were significantly more accurate on *tomorrow* compared to *before-yesterday* (English: *p* = .013; German: *p* < .001) and *after-tomorrow* (English: *p* = .005; German: *p* = .009). <insert stats for 3-year-olds as well>. English-speaking 5- and 6-year-olds were significantly more accurate on *yesterday* (English: *p*s < .015) and *tomorrow* (English: *p*s < .015) than on *before-yesterday* (see Figure6). No other item-level comparisons were significant including comparisons of *tomorrow* and *yesterday* in all age groups. 
+
+Figure 6. Proportion of English- and German-speaking children, by age, who placed each item in the correct square. 
+
+In light of the previous follow-up analyses suggesting that distal terms might have been more difficult for the youngest children in both languages, we next considered whether language, temporal location (proximal vs. distal), age, or their interaction predicted children's correct placement. All three factors significantly improved the fit of the model, and there was no evidence of an interaction: older children were more likely to place terms in the correct square than younger children (𝛽 = XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); the proximal terms that were lexicalized in both languages (*yesterday/tomorrow*) were easier for children to identify than the distal term s(*after-tomorrow/before-yesterday*; 𝛽= XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); and German speakers were better at booth distal terms that are only lexicalized in German, *and* proximal terms that are lexicalized in both languages (𝛽= XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX). 
+
+We also conducted an exploratory analysis considering whether language, the deictic status (past vs. future) of the item, age, or their interaction predicted children's correct placement. All three factors improved the model fit and we found no evidence of an interaction; older children were more likely tha younger children to place items in the correct squares (𝛽= XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); future items (*tomorrow/after-tomorrow*) were easier for children to identify than past terms (*yesterday/before-yesterday*; 𝛽= XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX); and German speakers were better at both future terms and past terms (𝛽= XX.XX, *p* < .XX; X^2 (X) = XX.X, *p* < .XX). 
+
+## Performance on Verbal Questions
+When asked to recite the days of the week, XX% of English-speakers (including XX% of 3-year-olds, XX% of 4-year-olds, XX% of 5-year-olds, XX% of 6-year-olds, and XX% of 7-year-olds) named all 7 days in order whithout help from the experimenter. In contrast, only XX% of German speakers (including XX% of 3-year-olds, XX% of 4-year-olds, XX% of 5-year-olds, XX% of 6-year-olds, and XX% of 7-year-olds) did so. 
+
+# Discussion
+
+
+\newpage
+
+# References
+
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+<div id="refs" custom-style="Bibliography"></div>
+\endgroup
