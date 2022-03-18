@@ -494,6 +494,23 @@ with(subset(Temp.Eng, AgeYears %in% c("7","adult")), t.test(RankDif~AgeYears, va
 with(subset(Temp.Ger, AgeYears %in% c("7","adult")), t.test(RankDif~AgeYears, var.equal=T))
 ```
 
+```{r plot development of avg rank order knowledge on timeline task}
+
+plot.data <- subset(Temp.TL12)
+plot.data.agg <- aggregate(avgRankDif ~ agegroup, plot.data, mean)
+plot.data.agg$varRank <- aggregate(avgRankDif ~ agegroup, plot.data, sd)$avgRankDif
+
+plot.RankDif <- ggplot(data=plot.data.agg, aes(x=agegroup, y=avgRankDif)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=BNCorrect + varRank, ymin=BNCorrect - varRank)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "avgRankDif ", breaks= c(.5,.6,.7,.8,.9,1), limits = c(.45, 1)) +
+  theme(axis.title = element_text(size=20))
+plot.RankDif 
+```
+
+
 ```{r check for item order effects on past/future placement}
 # check for item order effects
 

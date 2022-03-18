@@ -39,7 +39,7 @@ calv.d <- d.all %>%
 # R default is to "dummy" code: Reference level coded as zero; Others as 1
 # Sum or effect coding is more appropriate for Type III ANOVA: Levels coded so they sum to zero. If 2 levels, coded as -1 and 1 (BUT, R defaults to Type II so dummy coding should be fine here)
 
-# sum code language and prox
+# sum code language, prox, and itemtype
 calv.d$language <- as.factor(calv.d$language)
 calv.d <- mutate(calv.d, language.sc = language)
 contrasts(calv.d$language.sc) <- contr.sum(2)
@@ -78,7 +78,7 @@ contrasts(calv.d$item_stat.sc) <- contr.sum(2)
 # subset dataframe
 
 cal.d <- calv.d %>% #create data frame that includes 3- to 7-year-olds
-  filter(task=="calendar" & itemtype=="deictic") %>% # only select deictic calendar items (leave verbal items out) 
+  filter(task=="calendar" & itemtype=="deictic" & agegroup != "adult") %>% # only select deictic calendar items (leave verbal items out) 
   mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
 
 cal.d2 <- calv.d %>% # create new data frame and remove 3- and 7-year-olds
@@ -103,6 +103,7 @@ cal.g2 <- cal.g %>%
 ```
 
 ```{r data summary}
+# first unload plyr package
 cal.sum <- cal.d %>% # summarize data including 3- and 7-year-olds
   mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>% # for each word, how many kids got them right on the first try
   group_by(language, agegroup, item) %>%
@@ -138,8 +139,8 @@ cal.sum2 <- cal.d2 %>% # summary of data frame excluding 3- and 7-year-olds
 cal.sum3 <- cal.d %>%
   group_by(agegroup) %>%
   summarize(n = n(),
-            deictic1.m = (mean(stat.correct.1))*100, # who got correct status (first answer)
-            deictic1.sd = (sd(stat.correct.1))*100, # standard deviation
+            deictic1.m = (mean(stat.correct.1, na.rm = T))*100, # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T))*100, # standard deviation
             deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
             deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
             deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
@@ -154,28 +155,6 @@ deictic.sum <- calv.d %>%
             deicticv.lower = correct.m.d - se.correct.d, # calculate lower 95% CI
             deicticv.upper = correct.m.d + se.correct.d, # calculate upper 95% CI
             countCorrect.d = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
-```
-
-```{r summarize knowledge of remoteness}
-# calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
-cal.sum5 <- cal.d %>%
-  group_by(agegroup) %>%
-  summarize(n = n(),
-            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
-            remoteness.sd = (sd(cor.remote))*100, # standard deviation
-            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
-            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
-            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
-
-remoteness.sum <- calv.d %>%
-  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
-  group_by(language, agegroup, item) %>%
-  summarize(n = n(),
-            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
-            remoteness.sd = (sd(cor.remote))*100, # standard deviation
-            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
-            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
-            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
 ```
 
 ```{r knowledge of precise meaning aka box placement}
@@ -223,6 +202,7 @@ G <- ggplot(calhist.g, aes(x=response1)) +
 
 histograms <- ggarrange(E, G, 
                         ncol = 2, nrow = 1)
+histograms
 #ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi = 300)
 
 calhist.g <- calhist.g %>%
@@ -265,11 +245,108 @@ cal.sum4 <- cal.d2 %>%
 # does language spoken, item, or age (in years) predict successful placement of time words in the past or the future? [interaction term included in the model]
 
 # model with sum coded predictor variables
-d.lm1 <- glmer(stat.correct.1 ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+d.lm1 <- glmer(stat.correct.1 ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
 # once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
 summary(d.lm1) 
-Anova(d.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # only age is a significant predictor
 
+Anova(d.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # only age is a significant predictor
+```
+
+```{r prop correct past/future status}
+
+cal.sumProp <- cal.d %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            deictic1.m = (mean(stat.correct.1, na.rm = T)), # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T)), # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+CorrectStatPlacements <- ggplot(data=cal.sumProp, aes(x=agegroup, y = deictic1.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('n = X aross age and language groups') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+CorrectStatPlacements
+
+
+
+
+cal.sumPropEnglish <- cal.d %>%
+  filter(language == "english") %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            deictic1.m = (mean(stat.correct.1, na.rm = T)), # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T)), # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+EnglishPlacements <- ggplot(data=cal.sumPropEnglish, aes(x=agegroup, y = deictic1.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('English Speakers (n = X)') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+EnglishPlacements
+
+cal.sumPropGerman <- cal.d %>%
+  filter(language == "german") %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            deictic1.m = (mean(stat.correct.1, na.rm = T)), # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T)), # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+GermanPlacements <- ggplot(data=cal.sumPropGerman, aes(x=agegroup, y = deictic1.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('German Speakers (n = X)') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                axis.line = element_line(colour = "black"))
+GermanPlacements
+```
+
+```{r prox analyses}
 # it seems like (from Roman's slides) since we manipulate prox within-subjects, we should include this as a random slope e.g., prox|subjid
 #boundary (singular) fit: see ?isSingular
 #d.lm2 <- glmer(stat.correct.1 ~ prox.sc*language.sc*scale(ageyears) + (1+prox|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
@@ -315,11 +392,49 @@ DeicticStatus_German <- cal.g %>%
 DeicticStatus_German # sig difference at age 6 (p = .05)
 ```
 
-```{r predicting correct remoteness placement w/ages 4-7}
+```{r summarize knowledge of remoteness}
+# calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
+cal.sum5 <- cal.d %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+
+remoteness.sum <- calv.d %>%
+  filter(itemtype == "deictic" & agegroup %in% c('4', '5', '6', '7')) %>%
+  group_by(language, agegroup, item) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+
+langremoteness.sum <- calv.d %>%
+  filter(itemtype == "deictic") %>%
+  group_by(language, agegroup) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote, na.rm = T))*100, # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote, na.rm = T))*100, # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+```
+
+```{r predicting correct remoteness placement w/ages 3-7}
 #does language spoken, item, or age (in years) predict successful placement of time words the correct # of squares from today? [interaction term included in the model]
-remote1 <- glm(cor.remote ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears), family = binomial(link = "logit"), data=cal.d2) # excludes 3- and 7-year-olds
+remote1 <- glm(cor.remote ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears), family = binomial(link = "logit"), data=cal.d) 
 summary(remote1)
-Anova(remote1) # main effect of language, main effect of item (yesterday, tomorrow), main effect of age, but no interactions
+Anova(remote1) # main effect of language, main effect of item (yesterday, tomorrow), main effect of age, but no interactions (why are these main effects only showing up in the Anova?)
+
+All_remote <- cal.d %>% # conduct Wilcox_test 
+  #group_by(agegroup) %>% 
+  pairwise_wilcox_test(formula = cor.remote ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+All_remote 
 
 English.remote <- cal.e2 %>% # conduct Wilcox_test on English sample only
   #group_by(agegroup) %>% # no sig differences when grouped by age
@@ -334,17 +449,168 @@ German.remote <- cal.g2 %>% # conduct Wilcox_test on German sample only
 German.remote # same findings as English above
 ```
 
-```{r predicting precise meaning}
+```{r prop correct remoteness}
+
+cal.sum5Figure6 <- cal.d %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            remoteness.m = (mean(cor.remote)), # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote)), # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+
+CorrectRemoteness<- ggplot(data=cal.sum5Figure6, aes(x=agegroup, y = remoteness.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('n = X aross age and language groups') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+CorrectRemoteness
+
+```
+
+```{r predicting precise meaning I}
 # does language spoken, item,  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
 
 # model with sum coded predictor variables
-p.lm1 <- glmer(cor.first ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+p.lm1 <- glmer(cor.first ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_after.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
 # once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
 summary(p.lm1) 
-Anova(p.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of language, item (yesterday, tomorrow), age, and sig 3-way interaction betweeen language x item x age 
+Anova(p.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of item (yesterday, tomorrow), age, and sig 2-way interaction between language x age 
 
+# remove interaction term for item [when we do this, all the main effects are present]
+p.lm1.main <- glmer(cor.first ~ language.sc*item_yesterday.sc+item_tomorrow.sc+item_after.sc+ scale(ageyears)+(1|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+# once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
+summary(p.lm1.main) 
+Anova(p.lm1.main, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # all three main effects + language  age interaction
+
+#Wilcox_test for item level comparisons of cor.first by age (English-speakers only)
+PreciseMeaning_English <- cal.e2 %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+PreciseMeaning_English
+
+#Wilcox_test for item level comparisons of cor.first by age (German-speakers only)
+PreciseMeaning_German <- cal.g2 %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
+  add_significance()
+PreciseMeaning_German
+```
+
+```{r graph prop correct for precise meaning}
+cal.sum5Figure7 <- cal.d %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+
+PreciseKnowledge_Prop<- ggplot(data=cal.sum5Figure7, aes(x=agegroup, y = preciseknow.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('n = X aross age and language groups') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+PreciseKnowledge_Prop
+
+# now german-speakers only
+cal.sum5Figure7G <- cal.d %>%
+  filter(language == "german") %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+
+PreciseKnowledge_PropG<- ggplot(data=cal.sum5Figure7G, aes(x=agegroup, y = preciseknow.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('n = X German speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+PreciseKnowledge_PropG
+ggsave("Figure7B.jpeg", PreciseKnowledge_PropG, dpi = 300)
+
+# now english-speakers only
+cal.sum5Figure7E <- cal.d %>%
+  filter(language == "english" & agegroup != "adult") %>%
+  group_by(agegroup, item) %>%
+  summarize(n = n(),
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+
+
+PreciseKnowledge_PropE<- ggplot(data=cal.sum5Figure7E, aes(x=agegroup, y = preciseknow.m, group = item)) +
+  geom_line(aes(linetype=item)) +
+  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+  geom_point() +
+  ylab('') +
+  xlab('n = X English speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+PreciseKnowledge_PropE
+ggsave("Figure7A.jpeg", PreciseKnowledge_PropE, dpi = 300)
+```
+
+```{r predicting precise meaning II}
 # Does language group, age, and temporal location (proximal vs. distal) predict correct placement? [interaction term included in the model]
-p.lm2 <- glmer(cor.first ~ language.sc*prox.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+p.lm2 <- glmer(cor.first ~ language.sc*prox.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
 summary(p.lm2) 
 Anova(p.lm2, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # suggests there are effects of language, proximity, and ageyears with no interactions
 
@@ -352,10 +618,11 @@ Anova(p.lm2, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # suggests 
 p.lm2.1 <-  glmer(cor.first ~ language.sc + prox.sc + scale(ageyears) + (1|subjid), family='binomial', data=cal.d2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
 summary(p.lm2.1 )
 Anova(p.lm2.1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) #main effect of age, proximity, and language
+```
 
-
+```{r predicting precise meaning III}
 #does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
-p.lm3 <- glmer(cor.first ~ language.sc*item_stat.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d2) 
+p.lm3 <- glmer(cor.first ~ language.sc*item_stat.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d) 
 summary(p.lm3) 
 Anova(p.lm3, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # main effect of language, deictic status, and age but no interactions
 
@@ -369,23 +636,13 @@ p.lm4 <- glmer(cor.first ~ item_yesterday.sc*item_tomorrow.sc*item_after.sc + sc
 summary(p.lm4)
 Anova(p.lm4, Type=3) # main effect of item (yesterday, tomorrow, after tomorrow), and age, but no interactions
 
-#Wilcox_test for item level comparisons of cor.first by age (English-speakers only)
-PreciseMeaning_English <- cal.e2 %>%
-  group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
-  add_significance()
-PreciseMeaning_English
+
 
 p.lm5 <- glmer(cor.first ~ item_yesterday.sc*item_tomorrow.sc*item_after.sc + scale(ageyears) + (1|subjid), family = 'binomial', data=cal.g2) 
 summary(p.lm5)
 Anova(p.lm5, Type=3) # main effect of item (yesterday, tomorrow), and age, but no interactions
 
-#Wilcox_test for item level comparisons of cor.first by age (German-speakers only)
-PreciseMeaning_German <- cal.g2 %>%
-  group_by(agegroup) %>%
-  pairwise_wilcox_test(formula = cor.first ~ item, p.adjust.method = "BH") %>%
-  add_significance()
-PreciseMeaning_German
+
 
 language.itemTest <- cal.d2 %>%
   grouop_by(item) %>%
@@ -413,11 +670,162 @@ language.proxTestAge
 # 0 = distal, 1 = proximal
 ```
 
-```{r verbal questions}
+```{r plot development of three facets of knowledge in English speakers}
+# first deictic status
+# calculate
+cal.sumProp2 <- cal.d %>%
+  filter(language == "english") %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            stat.correct.1 = stat.correct.1, 
+            deictic1.m = (mean(stat.correct.1, na.rm = T)), # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T)), # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+# plot
+plot.deicticEnglish <- ggplot(data=cal.sumProp, aes(x=agegroup, y=deictic1.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=stat.correct.1 + deictic1.sd, ymin=stat.correct.1 - deictic1.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Deictic Status Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.deicticEnglish.png", plot.deicticEnglish, dpi = 300, height = 3, width = 3)
+
+# next remoteness
+cal.sum5.2 <- cal.d %>%
+  filter(language == "english")  %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            cor.remote = cor.remote,
+            remoteness.m = (mean(cor.remote, na.rm = T)), # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote, na.rm = T)), # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+# plot remoteness
+plot.remotenessEnglish <- ggplot(data=cal.sum5.2, aes(x=agegroup, y=remoteness.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.remote + remoteness.sd, ymin=cor.remote - remoteness.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Remoteness Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.remotenessEnglish.png", plot.remotenessEnglish, dpi = 300, height = 3, width = 3)
+
+# now precise knowledge 
+cal.sum5.3 <- cal.d %>%
+  filter(language == "english") %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            cor.first = cor.first,
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+# plot precise knowledge
+plot.preciseknowEnglish <- ggplot(data=cal.sum5.3, aes(x=agegroup, y=preciseknow.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.first + preciseknow.sd, ymin=cor.first - preciseknow.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Precise Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.preciseknowEnglish.png",plot.preciseknowEnglish, dpi = 300, height = 3, width = 3)
+```
+
+```{r plot development of three facets of knowledge in German speakers}
+# first deictic status
+# calculate
+cal.sumProp2German <- cal.d %>%
+  filter(language == "german") %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            stat.correct.1 = stat.correct.1, 
+            deictic1.m = (mean(stat.correct.1, na.rm = T)), # who got correct status (first answer)
+            deictic1.sd = (sd(stat.correct.1, na.rm = T)), # standard deviation
+            deictic1.se = deictic1.sd/sqrt(n), # calculate standard error
+            deictic1.lower = deictic1.m - deictic1.se, # calculate lower 95% CI
+            deictic1.upper = deictic1.m + deictic1.se) # calculate upper 95% CI
+
+# plot
+plot.DSGerman <- ggplot(data=cal.sumProp2German, aes(x=agegroup, y=deictic1.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=stat.correct.1 + deictic1.sd, ymin=stat.correct.1 - deictic1.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Deictic Status Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.DSGerman.png", plot.DSGerman, dpi = 300, height = 3, width = 3)
+
+# next remoteness
+cal.sum5.2German <- cal.d %>%
+  filter(language == "german") %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            cor.remote = cor.remote,
+            remoteness.m = (mean(cor.remote, na.rm = T)), # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote, na.rm = T)), # standard deviation
+            remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
+            remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
+            remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
+# plot remoteness
+plot.remotenessGerman <- ggplot(data=cal.sum5.2German, aes(x=agegroup, y=remoteness.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.remote + remoteness.sd, ymin=cor.remote - remoteness.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Remoteness Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.remotenessGerman .png", plot.remotenessGerman , dpi = 300, height = 3, width = 3)
+
+# now precise knowledge 
+cal.sum5.3German <- cal.d %>%
+  filter(language == "german")  %>%
+  group_by(agegroup) %>%
+  summarize(n = n(),
+            cor.first = cor.first,
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+# plot precise knowledge
+plot.preciseknowGerman <- ggplot(data=cal.sum5.3German, aes(x=agegroup, y=preciseknow.m)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.first + preciseknow.sd, ymin=cor.first - preciseknow.sd)) +
+  scale_x_discrete(name = "Age (years)") +
+  scale_y_continuous(name = "Mean Precise Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+
+ggsave("plot.preciseknowGerman.png",plot.preciseknowGerman, dpi = 300, height = 3, width = 3)
+```
+
+```{r verbal questions: days of the week}
+
 verbal <- d.all %>%
-  filter(itemtype=="verbal" & agegroup %in% c('4','5') & item=="daysofweek") %>%
-  group_by(language, item) %>%
-  summarize(correct.m <- mean(correct))
+  filter(itemtype == "verbal" & item == "daysofweek" & agegroup != "adult") %>%
+  summarize(Gcorrect.m <- mean(correct, na.rm = T),
+            Ecorrect.m <- mean(DaysOfWeek_Correct, na.rm = T)) 
+
+verbal_english <- d.all %>%
+  filter(itemtype=="verbal" & item=="daysofweek" & language == "english") %>%
+  group_by(language, item, agegroup) %>%
+  summarize(correct.m <- mean(DaysOfWeek_Correct, na.rm = T)) # withouot prompts from experimenter
+
+verbal_german <- d.all %>%
+  filter(itemtype=="verbal" & item=="daysofweek" & language == "german") %>%
+  group_by(language, item, agegroup) %>%
+  summarize(correct.m <- mean(correct, na.rm = T)) # without prompts from experimenter
 
 calv.dg <- calv.d %>% # filter out German participants only
   filter(language == "german")
@@ -446,23 +854,9 @@ English.test2 <- calv.de %>% # conduct Wilcox_test on english sample only
   pairwise_wilcox_test(formula = correct ~ itemtype, p.adjust.method = "BH") %>%
   add_significance()
 English.test2
+```
 
-# check percentage of participants (in each language group separately) that were able to correctly recite the days of the week
-daysofweek <- d.all %>%
-  select(-weekday, -ageyears, -order, -itemnum, -timelinefirst, -task, -linenum, -itemtype, -linelength, -distfrommid, -response2, -prompts, -item.stat, -stat.correct) %>%
-  filter(item == "daysofweek")
-
-German_daysofweek <- d.all %>%
-  filter(language == "german", item == "daysofweek", exclude == "0") %>%
-  select(subjid, agegroup, correct) %>%
-  group_by(correct, agegroup) %>%
-  summarise(n())
-
-English_daysofweek <- d.all %>%
-  filter(language == "english", item == "daysofweek", exclude == "0") %>%
-  select(subjid, agegroup, correct) %>%
-  group_by(correct, agegroup) %>%
-  summarise(n())
+```{r overall performance on verbal questions }
 
 #' Calculate % of children who correctly answered verbal questions
 
@@ -470,7 +864,7 @@ verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
 #calculate percentage of trials in which kids of each age group got verbal questions correct
 verbal.sum1 <- d.all %>%
-  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  filter(itemtype == "verbal" & agegroup %in% c('3','4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
   group_by(language, agegroup, item) %>%
   summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
             sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
@@ -481,7 +875,7 @@ verbal.sum1 <- d.all %>%
             countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
 
 verbal.sum2 <- d.all %>%
-  filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+  filter(itemtype == "verbal" & agegroup %in% c('3', '4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
   group_by(language, agegroup) %>%
   summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
             sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
