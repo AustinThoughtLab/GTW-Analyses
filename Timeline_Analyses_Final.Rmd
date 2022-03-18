@@ -48,6 +48,7 @@ d.TL <- d.all.timeline %>%
   mutate(distfrommid2 = case_when(distfrommid == 0 ~ 0.01,
                                   distfrommid > 0 ~ distfrommid,
                                   distfrommid < 0 ~ distfrommid))
+
 d.TL <- d.TL %>%
   mutate(item2 = case_when(linenum == 2 & item == "tomorrow" ~ "tomorrow.2",
                            linenum == 3 & item == "yesterday" ~ "yesterday.3",
@@ -108,10 +109,11 @@ DeicticStatus_Timeline <- d.TL2 %>%
   group_by(agegroup) %>%
   pairwise_wilcox_test(formula = BNCorrect ~ itemtype, p.adjust.method = "BH") %>%
   add_significance()
+ 
 DeicticStatus_Timeline
 
 d.TL2EN <- d.TL2 %>%
-  filter(language == "english" & agegroup %in% c("4", "5", "6", "7", "adult"))
+  filter(language == "english")
 
 #t.lm2 <- glmer(BNCorrect ~ itemtype.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=d.TL2EN, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) # language and age are significant predictors of BNCorrect
 #summary(t.lm2) 
@@ -124,7 +126,7 @@ DeicticStatus_EnglishTimeline <- d.TL2EN %>%
 DeicticStatus_EnglishTimeline
 
 d.TL2GERM <- d.TL2 %>%
-  filter(language == "german" & agegroup %in% c("4", "5", "6", "adult"))
+  filter(language == "german")
 
 DeicticStatus_GermanTimeline <- d.TL2GERM %>% 
   group_by(agegroup) %>%
@@ -181,6 +183,9 @@ deicticstatus.sum3
 ```{r t tests for past/future status placements}
 
 with(subset(d.TL2, agegroup=="3"), t.test(x=BNCorrect, mu=.5)) # not better than chance
+with(subset(d.TL2, agegroup=="3" & language == "english"), t.test(x=BNCorrect, mu=.5)) # greater than chance
+with(subset(d.TL2, agegroup=="3" & language == "german"), t.test(x=BNCorrect, mu=.5)) # greater than chance
+
 with(subset(d.TL2, agegroup=="4"), t.test(x=BNCorrect, mu=.5)) # greater than chance
 
 with(subset(d.TL2, agegroup=="4" & language == "english"), t.test(x=BNCorrect, mu=.5)) # greater than chance
@@ -332,9 +337,41 @@ plot.pastfuture <- ggplot(data=plot.data.agg, aes(x=agegroup, y=BNCorrect)) +
   geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=BNCorrect + varRank, ymin=BNCorrect - varRank)) +
   scale_x_discrete(name = "Age (years)") +
-  scale_y_continuous(name = "Deictic Status", breaks= c(.5,.6,.7,.8,.9,1), limits = c(.45, 1)) +
-  theme(axis.title = element_text(size=20))
+  scale_y_continuous(name = "Mean Deictic Status Knowledge", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
 plot.pastfuture
+
+plot.dataGerman <- d.TL2 %>%
+  filter(language == "german")
+plot.data.aggGerman <- aggregate(BNCorrect ~ agegroup, plot.dataGerman, mean)
+plot.data.aggGerman$varRank <- aggregate(BNCorrect ~ agegroup, plot.dataGerman, sd)$BNCorrect
+
+plot.pastfutureGerman <- ggplot(data=plot.data.aggGerman, aes(x=agegroup, y=BNCorrect)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=BNCorrect + varRank, ymin=BNCorrect - varRank)) +
+  scale_x_discrete(name = "German Speakers' Age (years)") +
+  scale_y_continuous(name = "Mean Deictic Status Knowledge", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+plot.pastfutureGerman
+
+ggsave("DS_GermanDev_Timeline.png", plot.pastfutureGerman, dpi = 300, height = 3, width = 3)
+
+plot.dataEnglish <- d.TL2 %>%
+  filter(language == "english")
+plot.data.aggEnglish <- aggregate(BNCorrect ~ agegroup, plot.dataEnglish, mean)
+plot.data.aggEnglish$varRank <- aggregate(BNCorrect ~ agegroup, plot.dataEnglish, sd)$BNCorrect
+
+plot.pastfutureEnglish <- ggplot(data=plot.data.aggEnglish, aes(x=agegroup, y=BNCorrect)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=BNCorrect + varRank, ymin=BNCorrect - varRank)) +
+  scale_x_discrete(name = "English Speakers' Age (years)") +
+  scale_y_continuous(name = "Mean Deictic Status Knowledge", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=12))
+plot.pastfutureEnglish
+
+ggsave("DS_EnglishDev_Timeline.png", plot.pastfutureEnglish, dpi = 300, height = 3, width = 3)
 
 ```
 
@@ -497,19 +534,48 @@ with(subset(Temp.Ger, AgeYears %in% c("7","adult")), t.test(RankDif~AgeYears, va
 ```{r plot development of avg rank order knowledge on timeline task}
 
 plot.data <- subset(Temp.TL12)
-plot.data.agg <- aggregate(avgRankDif ~ agegroup, plot.data, mean)
-plot.data.agg$varRank <- aggregate(avgRankDif ~ agegroup, plot.data, sd)$avgRankDif
+plot.data.agg <- aggregate(IsCorrect_Rank ~ agegroup, plot.data, mean)
+plot.data.agg$varRank <- aggregate(IsCorrect_Rank ~ agegroup, plot.data, sd)$IsCorrect_Rank
 
-plot.RankDif <- ggplot(data=plot.data.agg, aes(x=agegroup, y=avgRankDif)) + 
+plot.RankDif <- ggplot(data=plot.data.agg, aes(x=agegroup, y=IsCorrect_Rank)) + 
   # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
   geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
-  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=BNCorrect + varRank, ymin=BNCorrect - varRank)) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=IsCorrect_Rank + varRank, ymin=IsCorrect_Rank - varRank)) +
   scale_x_discrete(name = "Age (years)") +
-  scale_y_continuous(name = "avgRankDif ", breaks= c(.5,.6,.7,.8,.9,1), limits = c(.45, 1)) +
+  scale_y_continuous(name = "Mean Rank Order Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
   theme(axis.title = element_text(size=20))
 plot.RankDif 
-```
 
+plot.dataGerman <- Temp.TL12 %>%
+  filter(language == "german")
+plot.data.aggGerman <- aggregate(IsCorrect_Rank ~ agegroup, plot.dataGerman, mean)
+plot.data.aggGerman$varRank <- aggregate(IsCorrect_Rank ~ agegroup, plot.dataGerman, sd)$IsCorrect_Rank
+
+plot.RankDifGerman <- ggplot(data=plot.data.aggGerman, aes(x=agegroup, y=IsCorrect_Rank)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=IsCorrect_Rank + varRank, ymin=IsCorrect_Rank - varRank)) +
+  scale_x_discrete(name = "German Speakers' Age (years)") +
+  scale_y_continuous(name = "Mean Rank Order Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=20))
+plot.RankDifGerman
+ggsave("RankOrder_GermanDev_Timeline.png", plot.RankDifGerman, dpi = 300, height = 3, width = 3)
+
+plot.dataEnglish<- Temp.TL12 %>%
+  filter(language == "english")
+plot.data.aggEnglish <- aggregate(IsCorrect_Rank ~ agegroup, plot.dataEnglish, mean)
+plot.data.aggEnglish$varRank <- aggregate(IsCorrect_Rank ~ agegroup, plot.dataEnglish, sd)$IsCorrect_Rank
+
+plot.RankDifEnglish <- ggplot(data=plot.data.aggGerman, aes(x=agegroup, y=IsCorrect_Rank)) + 
+  # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
+  geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=IsCorrect_Rank + varRank, ymin=IsCorrect_Rank - varRank)) +
+  scale_x_discrete(name = "English Speakers' Age (years)") +
+  scale_y_continuous(name = "Mean Rank Order Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(axis.title = element_text(size=20))
+plot.RankDifEnglish
+ggsave("RankOrder_EnglishDev_Timeline.png", plot.RankDifEnglish, dpi = 300, height = 3, width = 3)
+```
 
 ```{r check for item order effects on past/future placement}
 # check for item order effects
@@ -558,8 +624,6 @@ d.TL12<- merge(d.TL2, MaxLinePlacements, by = c("subjid", "linenum")) %>%
 d.TL12$signedScaledDist <- d.TL12$distfrommid2/d.TL12$maxDistance # divide each raw distance by the maximum distance an item was placed on the line
 d.TL12$relOrd <- with(d.TL12, ifelse(Past == "1", abs(CorrectRank-3), CorrectRank-2)) # is it the first or the 2nd past item
 #se <- function(x) sqrt(var(x) / length(x)) # function for calculating standard error
-
-
 
 MedianPlacements <- d.TL12 %>%
   group_by(relOrd, Past, agegroup.x, language.x, item, linenum) %>%

@@ -45,30 +45,32 @@ d.g[setdiff(names(d.e), names(d.g))] <- NA
 
 # Some Data Management and wrangling
 # Combine German and English data and fix typos in data entry and re-code weekday (1-7 corresponds to Sun-Sat)#
-d.all <- rbind(d.g, d.e) %>% 
-  mutate(item = as.factor(item),
-         item = recode_factor(item, 'morning ' = 'thismorning',
-                                      'twodaysago' = 'beforeyesterday', 
-                                      'dayokweek' = 'daysofweek',
-                                      'last year' = 'lastyear',
-                                      'twofromnow' = 'aftertomorrow',
-                                      'twoago' = 'beforeyesterday',
-                                      'inaday' = 'tomorrow',
-                                      'dayago' = 'yesterday',
-                                      'onedayfromnow' = 'tomorrow',
-                                      'thisevening' = 'tonight'),
-         weekday = as.factor(weekday),
-         weekday = recode_factor(weekday, '1' = '7',
-                                 '2' = '1',
-                                 '3' = '2',
-                                 '4' = '3',
-                                 '5' = '4',
-                                 '6' = '5',
-                                 '7' = '6'), # recode default weekday function in excel to match calendar task (e.g., 1-7)
-        distfrommid = distfrommid_c1, # _c1/_c2 for ICC but for main analyses use distfrommid to avoid confusion
-        language = as.factor(language),
-        itemnum = as.factor(itemnum),
-        exclude = replace_na(exclude, 0))
+d.all <- rbind(d.g, d.e)
+d.all <- d.all %>%
+  mutate(item = case_when(item == "morning" ~ "thismorning",
+                          item == "twodaysago" ~ "beforeyesterday",
+                          item == "dayokweek" ~ "daysofweek",
+                          item == "last year" ~ "lastyear",
+                          item == "lastyear " ~ "lastyear",
+                          item == "twofromnow" ~ "aftertomorrow",
+                          item == "twoago" ~ "beforeyesterday",
+                          item == "inaday" ~ "tomorrow",
+                          item == "dayago" ~ "yesterday",
+                          item == "onedayfromnow" ~ "tomorrow",
+                          item == "thisevening" ~ "tonight",
+                          item == "Breakfast" ~ "breakfast",
+                          TRUE ~ item),
+         weekday = case_when(weekday == "1" ~ "7", # recode default weekday function in excel to match calendar task (e.g., 1-7)
+                             weekday == "2" ~ "1",
+                             weekday == "3" ~ "2",
+                             weekday == "4" ~ "3",
+                             weekday == "5" ~ "4",
+                             weekday == "6" ~ "5",
+                             weekday == "7" ~ "6"),
+         distfrommid = distfrommid_c1, # _c1/_c2 for ICC but for main analyses use distfrommid to avoid confusion
+         language = as.factor(language),
+         itemnum = as.factor(itemnum),
+         exclude = replace_na(exclude, 0))
 
 future.words = c('aftertoday','aftertomorrow','dinner','nextbday','nextweek','nextyear','tomorrow','tonight') # Code all future time words
 
