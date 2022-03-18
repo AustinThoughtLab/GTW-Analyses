@@ -14,7 +14,7 @@ ipak(lib)
 # Read in the  Data
 d.g <- read.csv('german_data.csv')
 d.g <- d.g %>%      
-  select(-dob, -dot, -agedays, -agemonths, -monolingual, -comments, -X, -X.1, -X.2, -X.3, -X.4) %>% # remove unnecessary columns
+  select(-dob, -dot, -agedays, -agemonths, -monolingual, -rank, -experimenter, -comments) %>% # remove unnecessary columns
   mutate(language = 'german',
         linenum = ifelse(item=="lastyear", 3, linenum)) # there appears to be an error where this item was incorrectly attributed to line 4
 
@@ -23,7 +23,7 @@ d.g[d.g == ""] <- NA # replace missing data and empty cells with NA
 
 d.e <- read.csv('english_data.csv')
 d.e <- d.e %>%
-  select(-ID,-dob, -dot, -agedays, -monolingual, -site, -rank, -covered, -comments, -experimenter) %>% # remove unnecessary columns
+  select(-ID,-dob, -dot, -agedays, -monolingual, -rank, -comments, -experimenter) %>% # remove unnecessary columns
   mutate(language = 'english')
 #d.a <- read.csv('TimelineData_All.csv', header=T) # read in adult timeline data
 #d.a <- d_a
