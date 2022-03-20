@@ -557,7 +557,7 @@ plot.RankDifGerman <- ggplot(data=plot.data.aggGerman, aes(x=agegroup, y=IsCorre
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=IsCorrect_Rank + varRank, ymin=IsCorrect_Rank - varRank)) +
   scale_x_discrete(name = "German Speakers' Age (years)") +
   scale_y_continuous(name = "Mean Rank Order Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(axis.title = element_text(size=20))
+  theme(axis.title = element_text(size=12))
 plot.RankDifGerman
 ggsave("RankOrder_GermanDev_Timeline.png", plot.RankDifGerman, dpi = 300, height = 3, width = 3)
 
@@ -572,7 +572,7 @@ plot.RankDifEnglish <- ggplot(data=plot.data.aggGerman, aes(x=agegroup, y=IsCorr
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=IsCorrect_Rank + varRank, ymin=IsCorrect_Rank - varRank)) +
   scale_x_discrete(name = "English Speakers' Age (years)") +
   scale_y_continuous(name = "Mean Rank Order Knowledge ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(axis.title = element_text(size=20))
+  theme(axis.title = element_text(size=12))
 plot.RankDifEnglish
 ggsave("RankOrder_EnglishDev_Timeline.png", plot.RankDifEnglish, dpi = 300, height = 3, width = 3)
 ```
@@ -697,7 +697,7 @@ timeline.endpoints2.english <- ggplot(subset(MedianPlacements2, language.x %in% 
   coord_flip()
 timeline.endpoints2.english
 
-ggsave("meantimelineplacements_english.jpeg", width = 20, height = 15)
+ggsave("meantimelineplacements_english.jpeg", timeline.endpoints2.english, width = 20, height = 10)
 ```
 
 ```{r plot median time placements in German}
@@ -736,6 +736,6 @@ timeline.endpoints2.german <- ggplot(subset(MedianPlacements2, language.x %in% c
   coord_flip()
 timeline.endpoints2.german
 
-ggsave("meantimelineplacements_german.jpeg", width = 20, height = 15)
+ggsave("meantimelineplacements_german.jpeg", timeline.endpoints2.german, width = 20, height = 10)
 ```
 
