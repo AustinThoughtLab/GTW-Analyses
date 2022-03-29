@@ -41,7 +41,7 @@ ICC(TimeLine_Reliability) # excellent reliability
 # subset timeline data
 d.all.timeline <- d.all %>%
   subset(task == "timeline") %>%
-  select(-distfrommid_c1, -distfrommid_c2, -response, -response1, -response2, -correctr, -correctR)
+  select(-response, -response1, -response2, -correctr, -correctR)
 
 # adjust responses that were coded as being located exactly "now"
 d.TL <- d.all.timeline %>%
@@ -99,7 +99,7 @@ d.TL2$itemtype <- as.factor(d.TL2$itemtype)
 d.TL2 <- mutate(d.TL2, itemtype.sc = itemtype)
 contrasts(d.TL2$itemtype.sc) <- contr.sum(2)
 
-t.lm1 <- glmer(BNCorrect ~ language.sc *itemtype.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=d.TL2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) # language, age, and itemtype are significant predictors of BNCorrect
+t.lm1 <- glmer(BNCorrect ~ language.sc *itemtype.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=d.TL2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) # main effects of age, and itemtype, age x language interaction and itemtype x language interaction (and three-way interaction)
 summary(t.lm1) 
 Anova(t.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) #  item type and age both improve the fit of the model
 
@@ -220,7 +220,7 @@ Temp.PF.m2 <- lm(BNCorrect ~ language * ageyears, d.TL4)
 summary(Temp.PF.m2) # age is still a significant predictor of past/future placement on the timeline after 3-year-olds are excluded 
 ```
 
-```{r plot proportion correct for past/future status placement}
+```{r plot proportion correct for past/future status placement (each language separately)}
 # first recode correct variable
 d.TL2$BNCorrect_cat[d.TL2$BNCorrect == 0] <- 'Incorrect'
 d.TL2$BNCorrect_cat[d.TL2$BNCorrect == 1] <- 'Correct'
@@ -326,6 +326,66 @@ GermanStatus.timeline
 
 ```
 
+```{r plot proportion correct for past/future status placement (collpased across languages)}
+# first recode correct variable
+d.TL2$BNCorrect_cat[d.TL2$BNCorrect == 0] <- 'Incorrect'
+d.TL2$BNCorrect_cat[d.TL2$BNCorrect == 1] <- 'Correct'
+
+d.TL2$agegroup <- as.factor(d.TL2$agegroup)
+
+# calculate proportions (English Data)
+BNprop <- d.TL2 %>%
+  count(agegroup, BNCorrect_cat) %>% # group_by() & summarize(n=n()) are implicit
+  mutate(prop = prop.table(n)) # prop = n/sum(n) works too
+as.data.frame(BNprop) # strip tbl_df() properties to print
+
+# create ggplot
+prop_DS <- ggplot(data = BNprop, 
+                 aes (x = agegroup, y = prop, fill = BNCorrect_cat)) +
+  geom_bar(stat = 'identity', position = 'stack', alpha = 2/3) + # or use position = 'dodge' for grouped bars
+  scale_y_continuous(labels = percent) + # or =waiver() or NULL for the default labels computed by the transformation object
+  scale_fill_few('Medium', drop = FALSE) + # keeps levels if data is filtered
+  labs(x = "Age", y = NULL, fill = 'Correct Past/Future Assignment',
+       title = 'Proportions Correct by Age Group (English Data)')
+prop_DS
+
+
+## now create a mean deictic status accuracy for each type of timeline for each  age group
+DS.sum <- d.TL2 %>%
+  group_by(itemtype, agegroup) %>%
+  summarize(n = n(),
+            DS.m = (mean(BNCorrect, na.rm = T)), # who got correct status (first answer)
+            DS.sd = (sd(BNCorrect, na.rm = T)), # standard deviation
+            DS.se = DS.sd/sqrt(n), # calculate standard error
+            DS.lower = DS.m - DS.se, # calculate lower 95% CI
+            DS.upper = DS.m + DS.se) # calculate upper 95% CI
+DS.sum
+
+#Plot correct status by item type (for each language separately)
+# first english-speakers
+DS.timeline <- ggplot(data=DS.sum, aes(x=agegroup, y=DS.m, group=itemtype, color=itemtype)) +
+  geom_line(aes(color=itemtype))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+  theme(legend.position = "top") +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))
+DS.timeline
+
+ggsave("DS.timeline.png", DS.timeline, dpi = 300)
+
+```
+
 ```{r plot development of past/future status knowledge on timeline task}
 
 plot.data <- subset(d.TL2)
@@ -388,11 +448,11 @@ d.TL2$item <- factor(d.TL2$item2)
 
 #Now figure out the trialnumber and make it numeric
 d.TL2$TrialNum <- with(d.TL2,ifelse(order==1,
-                                      match(item,c("breakfast","nextbday","dinner","lastbday","lastweek","tomorrow.2",
+                                      match(item2,c("breakfast","nextbday","dinner","lastbday","lastweek","tomorrow.2",
                                                    "tonight","thismorning","nextweek","nextyear","yesterday.3","lastyear", 
                                                    "yesterday.4","tomorrow.4", "aftertomorrow", "beforeyesterday")
                                       ),
-                                      match(item,c("lastbday","dinner","nextbday","breakfast","thismorning","tonight",
+                                      match(item2,c("lastbday","dinner","nextbday","breakfast","thismorning","tonight",
                                                    "tomorrow.2","lastweek","lastyear","yesterday.3","nextyear","nextweek", 
                                                    "tomorrow.4", "yesterday.4", "beforeyesterday", "aftertomorrow")
                                       )
@@ -483,6 +543,45 @@ rankorder.sum <- d.TL2 %>%
             RO.upper = RO.m + RO.se) # calculate upper 95% CI
 rankorder.sum
 ```
+
+```{r rank order N-back method}
+# this function is not working
+d.TL2$ComparedToPrevious <- ""
+RelRankData <- subset(d.TL2, subjid=="nothing")
+for(sub_i in levels(d.TL2$subjid)){
+  for(trial_i in c(2,3,4,6,7,8,10,11,12,13,14,15,16)){
+    foo <- subset(d.TL2, subjid==sub_i & TrialNum==trial_i)
+    fooPrev <- subset(d.TL2, subjid==sub_i & TrialNum==trial_i-1)
+    foo$ComparedToPrevious <- ifelse(foo$Rank > fooPrev$Rank, "R","L")
+    foo$CorrComparedToPrevious <- ifelse(foo$CorrectRank > fooPrev$CorrectRank, "R","L")
+    RelRankData2 <- rbind(RelRankData, foo)
+  }
+}
+
+# this is gross but I did it manually in excel 
+
+write.csv(d.TL2,"d.TL2.csv")
+
+# now reading the data back in with new columns 
+RelRankData <- read.csv("d.TL2.csv")
+
+RelRankData$ComparedToPrevious <- ifelse(RelRankData$Rank > RelRankData$PrevRank, "R", "L")
+RelRankData$CorrComparedToPrevious <- ifelse(RelRankData$CorrectRank > RelRankData$PrevCorrectRank, "R", "L")
+RelRankData$AccRelRank <- with(RelRankData, ifelse(ComparedToPrevious == CorrComparedToPrevious, 1, 0))
+RelRankData <- subset(RelRankData, ageyears %in% c("3","4","5","6","7","adult"))
+
+aggregate(AccRelRank~itemtype + ageyears, RelRankData, mean, na.rm=T)
+RelRankData.agg <- aggregate(AccRelRank~ageyears + itemtype  + subjid, RelRankData, mean, na.rm=T)
+RelRankData.agg$itemtype <- factor(RelRankData.agg$itemtype)
+RelRankData.agg$subjid <- factor(RelRankData.agg$subjid)
+#xtabs(~BNCorrect + itemtype, RelRankData.agg)
+subset(as.data.frame(xtabs(~SubjID, RelRankData.agg)), Freq<2)
+RelRankData.agg$tAccRelRank <- asin(sqrt(RelRankData.agg$AccRelRank))
+  
+
+```
+
+
 
 ```{r analysis of ordinal rank -- t-test on mean accuracy-- }
 # t-tests by age of aggregate Rank error (mean accuracy) ####
@@ -659,9 +758,11 @@ adultLabels <- MedianPlacements2 %>%
   filter(AgeYears == "adult" & language.x == "german")
 
 MedianPlacements2$newlineorder <- factor(MedianPlacements2$lineNames, levels = c("Events","Deictic Terms 1","Deictic Terms 2", "Deictic Terms 3"))
+
 ```
 
 ```{r plot median time placements in English}
+  
 timeline.endpoints2.english <- ggplot(subset(MedianPlacements2, language.x %in% c("english")), 
                               aes(x=AgeYears, y=medianlines, group=item, color=Past, fill=Past)) + 
   geom_ribbon(aes(ymin=medianlines-medianlines.se, ymax=medianlines+medianlines.se), alpha=.3) +
@@ -739,3 +840,183 @@ timeline.endpoints2.german
 ggsave("meantimelineplacements_german.jpeg", timeline.endpoints2.german, width = 20, height = 10)
 ```
 
+```{r plot median placements collapsed across language groups}
+# calculate maximum placement distance for each timeline
+MaxLinePlacements <- d.TL2 %>%
+  group_by(subjid, linenum, agegroup) %>%
+  summarize(n = n(),
+            maxDistance = max(abs(distfrommid2)))
+#d.TL2$subjid <- factor(d.TL2$subjid)
+
+d.TL12<- merge(d.TL2, MaxLinePlacements, by = c("subjid", "linenum")) %>%
+  mutate(Past = ifelse(item.stat == 0, "1", "0"))
+
+d.TL12$signedScaledDist <- d.TL12$distfrommid2/d.TL12$maxDistance # divide each raw distance by the maximum distance an item was placed on the line
+d.TL12$relOrd <- with(d.TL12, ifelse(Past == "1", abs(CorrectRank-3), CorrectRank-2)) # is it the first or the 2nd past item
+#se <- function(x) sqrt(var(x) / length(x)) # function for calculating standard error
+
+MedianPlacements <- d.TL12 %>%
+  group_by(relOrd, Past, agegroup.x, item, linenum) %>%
+  summarize(n = n(),
+            medianlines = (median(signedScaledDist, na.rm = T)), # find median 
+            medianlines_sd = (sd(signedScaledDist, na.rm = T)), # calculate standard deviation
+            medianlines.se = medianlines_sd/sqrt(length(na.omit(signedScaledDist)))) # calculate standard error
+  
+library(plyr)
+MedianPlacements$overallDeicticOrder <- as.ordered(as.character(mapvalues(MedianPlacements$item, c("lastyear", "lastbday", "lastweek", "beforeyesterday", "yesterday.3","yesterday.4", "thismorning","breakfast", "dinner", "tonight","tomorrow.2","tomorrow.4", "aftertomorrow", "nextweek","nextyear", "nextbday"), c(1,2,3,4,5,6,7,8,9,10,11,12, 13, 14, 15, 16))))
+MedianPlacements$deicticSize <- 4 + as.numeric(MedianPlacements$overallDeicticOrder)
+MedianPlacements$lineNames <- with(MedianPlacements, ifelse(linenum==1, "Events", ifelse(linenum== 2, "Deictic Terms 1", ifelse(linenum==3, "Deictic Terms 2","Deictic Terms 3"))))
+MedianPlacements$AgeYears = with(MedianPlacements, factor(agegroup.x))
+
+MedianPlacements2 <- MedianPlacements %>%
+  mutate(item_recode = as.factor(case_when(linenum == 3 & item == "yesterday.3" ~ "yesterday",
+                                 linenum == 4 & item == "yesterday.4" ~ "yesterday",
+                                 linenum == 2 & item == "tomorrow.2" ~ "tomorrow",
+                                 linenum == 4 & item == "tomorrow.4" ~ "tomorrow",
+                                 item == "lastyear" ~ "lastyear",
+                                 item == "lastweek" ~ "lastweek",
+                                 item == "beforeyesterday" ~ "beforeyesterday",
+                                 item == "thismorning" ~ "thismorning",
+                                 item == "tonight" ~ "tonight",
+                                 item == "aftertomorrow" ~ "aftertomorrow",
+                                 item == "nextweek" ~ "nextweek",
+                                 item == "nextyear" ~ "nextyear",
+                                 item == "nextbday" ~ "nextbday",
+                                 item == "lastbday" ~ "lastbday",
+                                 item == "dinner" ~ "dinner",
+                                 item == "breakfast" ~ "breakfast")))
+#adultLabels <- MedianPlacements2 %>%
+  #filter(AgeYears == "adult")
+
+MedianPlacements2$newlineorder <- factor(MedianPlacements2$lineNames, levels = c("Events","Deictic Terms 1","Deictic Terms 2", "Deictic Terms 3"))
+
+
+
+timeline.endpoints2 <- ggplot(MedianPlacements2, 
+                              aes(x=AgeYears, y=medianlines, group=item, color=Past, fill=Past)) + 
+  geom_ribbon(aes(ymin=medianlines-medianlines.se, ymax=medianlines+medianlines.se), alpha=.3) +
+  geom_path(size=2) + 
+  geom_point(aes(size=relOrd*3),size=8) +
+  geom_segment(aes(y=0, yend=0, x=.9, xend=1.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=1.9, xend=2.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=2.9, xend=3.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=3.9, xend=4.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=4.9, xend=5.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=5.9, xend=6.1), linetype="solid", size=1, color="black") +
+  geom_text(aes(label=item_recode), data = adultLabels, color="black", size=6, angle=25, nudge_x = .35, check_overlap = TRUE) + 
+  facet_grid(~lineNames) +
+  scale_color_discrete(name='', labels=c("future","past")) + 
+  scale_fill_discrete(name='', labels=c("future","past")) + 
+  scale_y_continuous(name="median location", limits=c(-1.24,1.24), breaks=c(0), labels=c("")) + 
+  scale_x_discrete(name="age") + 
+  theme_classic() + 
+  theme(legend.position = "right",
+        panel.grid.major.y = element_line(size=2, color="darkgrey"),
+        panel.grid.major.x = element_line(size=0),
+        panel.grid.minor.x = element_line(size=0),
+        axis.text = element_text(size = rel(1.2)),
+        axis.title = element_text(size = rel(2)),
+        legend.text = element_text(size = rel(1.5)),
+        strip.text = element_text(size = rel(1.5), face="bold"),
+        strip.background = element_rect(fill = 'white', color="white"),
+        panel.background = element_rect(color="white"),
+        panel.border = element_blank(),
+        # panel.margin = unit(8, "lines"),
+        axis.line = element_blank(),
+        axis.ticks = element_blank()) +
+  coord_flip()
+timeline.endpoints2
+
+ggsave("meantimelineplacements.jpeg", timeline.endpoints2, width = 30, height = 10)
+```
+
+```{r plot median placements collapsed across language groups - Deictic 3 only}
+# calculate maximum placement distance for each timeline
+MaxLinePlacements <- d.TL2 %>%
+  group_by(subjid, linenum, agegroup) %>%
+  summarize(n = n(),
+            maxDistance = max(abs(distfrommid2)))
+
+#d.TL2$subjid <- factor(d.TL2$subjid)
+
+d.TL12<- merge(d.TL2, MaxLinePlacements, by = c("subjid", "linenum")) %>%
+  mutate(Past = ifelse(item.stat == 0, "1", "0"))
+
+d.TL12$signedScaledDist <- d.TL12$distfrommid2/d.TL12$maxDistance # divide each raw distance by the maximum distance an item was placed on the line
+d.TL12$relOrd <- with(d.TL12, ifelse(Past == "1", abs(CorrectRank-3), CorrectRank-2)) # is it the first or the 2nd past item
+#se <- function(x) sqrt(var(x) / length(x)) # function for calculating standard error
+
+MedianPlacements <- d.TL12 %>%
+  group_by(relOrd, Past, agegroup.x, item, linenum) %>%
+  summarize(n = n(),
+            medianlines = (median(signedScaledDist, na.rm = T)), # find median 
+            medianlines_sd = (sd(signedScaledDist, na.rm = T)), # calculate standard deviation
+            medianlines.se = medianlines_sd/sqrt(length(na.omit(signedScaledDist)))) # calculate standard error
+  
+library(plyr)
+MedianPlacements$overallDeicticOrder <- as.ordered(as.character(mapvalues(MedianPlacements$item, c("lastyear", "lastbday", "lastweek", "beforeyesterday", "yesterday.3","yesterday.4", "thismorning","breakfast", "dinner", "tonight","tomorrow.2","tomorrow.4", "aftertomorrow", "nextweek","nextyear", "nextbday"), c(1,2,3,4,5,6,7,8,9,10,11,12, 13, 14, 15, 16))))
+MedianPlacements$deicticSize <- 4 + as.numeric(MedianPlacements$overallDeicticOrder)
+MedianPlacements$lineNames <- with(MedianPlacements, ifelse(linenum==1, "Events", ifelse(linenum== 2, "Deictic Terms 1", ifelse(linenum==3, "Deictic Terms 2","Deictic Terms 3"))))
+MedianPlacements$AgeYears = with(MedianPlacements, factor(agegroup.x))
+
+MedianPlacements2 <- MedianPlacements %>%
+  mutate(item_recode = as.factor(case_when(linenum == 3 & item == "yesterday.3" ~ "yesterday",
+                                 linenum == 4 & item == "yesterday.4" ~ "yesterday",
+                                 linenum == 2 & item == "tomorrow.2" ~ "tomorrow",
+                                 linenum == 4 & item == "tomorrow.4" ~ "tomorrow",
+                                 item == "lastyear" ~ "lastyear",
+                                 item == "lastweek" ~ "lastweek",
+                                 item == "beforeyesterday" ~ "beforeyesterday",
+                                 item == "thismorning" ~ "thismorning",
+                                 item == "tonight" ~ "tonight",
+                                 item == "aftertomorrow" ~ "aftertomorrow",
+                                 item == "nextweek" ~ "nextweek",
+                                 item == "nextyear" ~ "nextyear",
+                                 item == "nextbday" ~ "nextbday",
+                                 item == "lastbday" ~ "lastbday",
+                                 item == "dinner" ~ "dinner",
+                                 item == "breakfast" ~ "breakfast")))
+
+
+MedianPlacements2.Deictic3 <-  MedianPlacements2 %>%
+  filter(linenum == 4)
+
+adultLabels.Deictic3 <- MedianPlacements2.Deictic3 %>%
+  filter(AgeYears == "adult")
+
+timeline.endpoints2Deictic3 <- ggplot(MedianPlacements2.Deictic3, 
+                              aes(x=AgeYears, y=medianlines, group=item, color=Past, fill=Past)) + 
+  geom_ribbon(aes(ymin=medianlines-medianlines.se, ymax=medianlines+medianlines.se), alpha=.3) +
+  geom_path(size=2) + 
+  geom_point(aes(size=relOrd*3),size=8) +
+  geom_segment(aes(y=0, yend=0, x=.9, xend=1.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=1.9, xend=2.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=2.9, xend=3.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=3.9, xend=4.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=4.9, xend=5.1), linetype="solid", size=1, color="black") + 
+  geom_segment(aes(y=0, yend=0, x=5.9, xend=6.1), linetype="solid", size=1, color="black") +
+  geom_text(aes(label=item), data = adultLabels.Deictic3, color="black", size=6, angle=25, nudge_x = .35, check_overlap = TRUE) + 
+  scale_color_discrete(name='', labels=c("future","past")) + 
+  scale_fill_discrete(name='', labels=c("future","past")) + 
+  scale_y_continuous(name="median location", limits=c(-1.24,1.24), breaks=c(0), labels=c("")) + 
+  scale_x_discrete(name="age") + 
+  theme_classic() + 
+  theme(legend.position = "right",
+        panel.grid.major.y = element_line(size=2, color="darkgrey"),
+        panel.grid.major.x = element_line(size=0),
+        panel.grid.minor.x = element_line(size=0),
+        axis.text = element_text(size = rel(1.2)),
+        axis.title = element_text(size = rel(2)),
+        legend.text = element_text(size = rel(1.5)),
+        strip.text = element_text(size = rel(1.5), face="bold"),
+        strip.background = element_rect(fill = 'white', color="white"),
+        panel.background = element_rect(color="white"),
+        panel.border = element_blank(),
+        # panel.margin = unit(8, "lines"),
+        axis.line = element_blank(),
+        axis.ticks = element_blank()) +
+  coord_flip()
+timeline.endpoints2Deictic3
+
+ggsave("meantimelineplacementsDeictic3.jpeg", timeline.endpoints2Deictic3, width = 8, height = 10)
+```
