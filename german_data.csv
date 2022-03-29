@@ -1,4 +1,4 @@
-subjid,dob,dot,weekday,agedays,agemonths,ageyears,agegroup,language,monolingual,order,timelinefirst,task,linenum,itemtype,itemnum,item,linelength,distfrommid_c1,rank,distfrommid_c2,response1,response2,response ,correctr,prompts,comments,exclude,experimenter,DaysOfWeek_Correct,Num_Prompts
+subjid,dob,dot,weekday,agedays,agemonths,ageyears,agegroup,language,monolingual,order,timelinefirst,task,linenum,itemtype,itemnum,item,linelength,distfrommid,rank,distfrommid_2,response1,response2,response ,correctr,prompts,comments,exclude,experimenter,DaysOfWeek_Correct,Num_Prompts
 01LS,11/9/17,10/20/21,4,1442,,3.11,3,german,1,1,0,timeline,1,event,1,breakfast,14.6,-6.1,,,,,1,2,,,0,,,
 01LS,11/9/17,10/20/21,4,1442,,3.11,3,german,1,1,0,timeline,1,event,2,nextbday,14.6,6.9,,,,,3,4,,,0,,,
 01LS,11/9/17,10/20/21,4,1442,,3.11,3,german,1,1,0,timeline,1,event,3,dinner,14.6,4.1,,,,,2,3,,,0,,,

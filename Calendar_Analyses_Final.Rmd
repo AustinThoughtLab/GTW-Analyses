@@ -259,7 +259,16 @@ d.lm1 <- glmer(stat.correct.1 ~ language.sc*item_yesterday.sc*item_tomorrow.sc*i
 # once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
 summary(d.lm1) 
 
-Anova(d.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # only age is a significant predictor
+Anova(d.lm1, contrasts=list(topic=contr.sum, sys=contr.sum), type=3) # only age is a significant predictor
+
+
+# does language spoken, proximity, or age (in years) predict successful placement of time words in the past or the future? 
+# model with sum coded predictor variables
+d.lm2 <- glmer(stat.correct.1 ~ language.sc*prox.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=cal.d, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) 
+# once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
+summary(d.lm2) 
+
+Anova(d.lm2, contrasts=list(topic=contr.sum, sys=contr.sum), type=3) # only age is a significant predictor
 ```
 
 ```{r prop correct past/future status}
@@ -413,7 +422,7 @@ DeicticStatus_German # sig difference at age 6 (p = .05)
 ```{r summarize knowledge of remoteness}
 # calculate percentage of trials in which kids of each age group responded with correct remoteness on calendar questions
 cal.sum5 <- cal.d %>%
-  group_by(agegroup) %>%
+  group_by(agegroup, prox) %>%
   summarize(n = n(),
             remoteness.m = (mean(cor.remote, na.rm = T))*100, # who got correct status (first answer)
             remoteness.sd = (sd(cor.remote, na.rm = T))*100, # standard deviation
@@ -448,9 +457,15 @@ remote1 <- glm(cor.remote ~ language.sc*item_yesterday.sc*item_tomorrow.sc*item_
 summary(remote1)
 Anova(remote1) # main effect of item (yesterday, tomorrow), main effect of age, but no interactions (why are these main effects only showing up in the Anova?)
 
+
+#does language spoken, proximity, or age (in years) predict successful placement of time words the correct # of squares from today? [interaction term included in the model]
+remote2 <- glm(cor.remote ~ language.sc*prox.sc*scale(ageyears), family = binomial(link = "logit"), data=cal.d) 
+summary(remote2)# main effect of proximity and age, but no effect of language
+Anova(remote2) 
+
 All_remote <- cal.d %>% # conduct Wilcox_test 
   #group_by(agegroup) %>% 
-  pairwise_wilcox_test(formula = cor.remote ~ item, p.adjust.method = "BH") %>%
+  pairwise_wilcox_test(formula = cor.remote ~ prox, p.adjust.method = "BH") %>%
   add_significance()
 All_remote 
 
@@ -470,19 +485,23 @@ German.remote # same findings as English above
 ```{r prop correct remoteness}
 
 cal.sum5Figure6 <- cal.d %>%
-  group_by(agegroup, item) %>%
+  group_by(agegroup, prox) %>%
   summarize(n = n(),
-            remoteness.m = (mean(cor.remote)), # who got correct status (first answer)
-            remoteness.sd = (sd(cor.remote)), # standard deviation
+            remoteness.m = (mean(cor.remote, na.rm = T)), # who got correct status (first answer)
+            remoteness.sd = (sd(cor.remote, na.rm = T)), # standard deviation
             remoteness.se = remoteness.sd/sqrt(n), # calculate standard error
             remoteness.lower = remoteness.m - remoteness.se, # calculate lower 95% CI
             remoteness.upper = remoteness.m + remoteness.se) # calculate upper 95% CI
 
-CorrectRemoteness<- ggplot(data=cal.sum5Figure6, aes(x=agegroup, y = remoteness.m, group = item)) +
-  geom_line(aes(linetype=item)) +
-  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+cal.sum5Figure6$proxFac <- case_when(cal.sum5Figure6$prox == 1 ~ "Proximal",
+                                     cal.sum5Figure6$prox == 0 ~ "Distal")
+
+
+CorrectRemoteness<- ggplot(data=cal.sum5Figure6, aes(x=agegroup, y = remoteness.m, group = proxFac)) +
+  geom_line(aes(linetype=proxFac)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
   geom_point() +
-  ylab('Proportion Correct (Remoteness)') +
+  ylab('Proportion Correct') +
   xlab('Age') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
@@ -492,7 +511,7 @@ CorrectRemoteness<- ggplot(data=cal.sum5Figure6, aes(x=agegroup, y = remoteness.
         axis.text.y = element_text(family = "Times", color = "black", size = 14), 
         axis.title.x = element_text(family = "Times", color = "black", size = 14),
         axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
-          theme(legend.position = "top") +
+          theme(legend.position = "top", legend.title = element_blank()) +
           theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
                 #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black"))
@@ -534,7 +553,7 @@ PreciseMeaning_German
 
 ```{r graph prop correct for precise meaning}
 cal.sum5Figure7 <- cal.d %>%
-  group_by(agegroup, item) %>%
+  group_by(agegroup, language) %>%
   summarize(n = n(),
             preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
             preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
@@ -542,11 +561,11 @@ cal.sum5Figure7 <- cal.d %>%
             preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
             preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
 
-PreciseKnowledge_Prop<- ggplot(data=cal.sum5Figure7, aes(x=agegroup, y = preciseknow.m, group = item)) +
-  geom_line(aes(linetype=item)) +
-  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+PreciseKnowledge_Prop<- ggplot(data=cal.sum5Figure7, aes(x=agegroup, y = preciseknow.m, group = language)) +
+  geom_line(aes(linetype = language)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
   geom_point() +
-  ylab('Proportion Correct (Precise Meaning)') +
+  ylab('Proportion Correct') +
   xlab('Age') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
@@ -563,11 +582,12 @@ PreciseKnowledge_Prop<- ggplot(data=cal.sum5Figure7, aes(x=agegroup, y = precise
 PreciseKnowledge_Prop
 
 ggsave("CalPreciseKnowledge_PropProp.jpeg",PreciseKnowledge_Prop, dpi = 300, width = 10, height = 7)
+```
 
-# now german-speakers only
-cal.sum5Figure7G <- cal.d %>%
-  filter(language == "german") %>%
-  group_by(agegroup, item) %>%
+```{r graph prop correct for distal terms only }
+cal.sum5Figure7.5 <- cal.d %>%
+  filter(prox != 1) %>%
+  group_by(agegroup, language) %>%
   summarize(n = n(),
             preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
             preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
@@ -575,12 +595,13 @@ cal.sum5Figure7G <- cal.d %>%
             preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
             preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
 
-PreciseKnowledge_PropG<- ggplot(data=cal.sum5Figure7G, aes(x=agegroup, y = preciseknow.m, group = item)) +
-  geom_line(aes(linetype=item)) +
-  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+
+PreciseKnowledge_Prop2<- ggplot(data=cal.sum5Figure7.5, aes(x=agegroup, y = preciseknow.m, group = language)) +
+  geom_line(aes(linetype = language)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
   geom_point() +
-  ylab('Proportion Correct (Precise Meaning)') +
-  xlab('German Speakers') +
+  ylab('Proportion Correct (Distal Terms)') +
+  xlab('Age') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
   theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
@@ -593,13 +614,16 @@ PreciseKnowledge_PropG<- ggplot(data=cal.sum5Figure7G, aes(x=agegroup, y = preci
           theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
                 #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black"))
-PreciseKnowledge_PropG
-ggsave("Figure7B.jpeg", PreciseKnowledge_PropG, dpi = 300)
 
-# now english-speakers only
-cal.sum5Figure7E <- cal.d %>%
-  filter(language == "english" & agegroup != "adult") %>%
-  group_by(agegroup, item) %>%
+PreciseKnowledge_Prop2
+
+ggsave("CalPreciseKnowledge_PropProp2.jpeg",PreciseKnowledge_Prop2, dpi = 300, width = 10, height = 7)
+```
+
+```{r graph prop correct for proximal terms only }
+cal.sum5Figure7.6 <- cal.d %>%
+  filter(prox != 0) %>%
+  group_by(agegroup, language) %>%
   summarize(n = n(),
             preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
             preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
@@ -608,12 +632,12 @@ cal.sum5Figure7E <- cal.d %>%
             preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
 
 
-PreciseKnowledge_PropE<- ggplot(data=cal.sum5Figure7E, aes(x=agegroup, y = preciseknow.m, group = item)) +
-  geom_line(aes(linetype=item)) +
-  scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
+PreciseKnowledge_Prop3<- ggplot(data=cal.sum5Figure7.6, aes(x=agegroup, y = preciseknow.m, group = language)) +
+  geom_line(aes(linetype = language)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
   geom_point() +
-  ylab('Proportion Correct (Precise Meaning)') +
-  xlab('English Speakers') +
+  ylab('Proportion Correct (Proximal Terms)') +
+  xlab('Age') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
   theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
@@ -623,6 +647,80 @@ PreciseKnowledge_PropE<- ggplot(data=cal.sum5Figure7E, aes(x=agegroup, y = preci
         axis.title.x = element_text(family = "Times", color = "black", size = 14),
         axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
           theme(legend.position = "top") +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+
+PreciseKnowledge_Prop3
+
+ggsave("CalPreciseKnowledge_PropProp3.jpeg",PreciseKnowledge_Prop3, dpi = 300, width = 10, height = 7)
+```
+
+```{r graph prop correct for each language group separately}
+# now german-speakers only
+cal.sum5Figure7G <- cal.d %>%
+  filter(language == "german") %>%
+  group_by(agegroup, prox) %>%
+  summarize(n = n(),
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+
+cal.sum5Figure7G$proxFac <- case_when(cal.sum5Figure7G$prox == 1 ~ "Proximal",
+                                     cal.sum5Figure7G$prox == 0 ~ "Distal")
+
+PreciseKnowledge_PropG<- ggplot(data=cal.sum5Figure7G, aes(x=agegroup, y = preciseknow.m, group = proxFac)) +
+  geom_line(aes(linetype=proxFac)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('German Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top", legend.title = element_blank()) +
+          theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black"))
+PreciseKnowledge_PropG
+ggsave("Figure7B.jpeg", PreciseKnowledge_PropG, dpi = 300)
+
+# now english-speakers only
+cal.sum5Figure7E <- cal.d %>%
+  filter(language == "english" & agegroup != "adult") %>%
+  group_by(agegroup, prox) %>%
+  summarize(n = n(),
+            preciseknow.m = (mean(cor.first, na.rm = T)), # who got correct status (first answer)
+            preciseknow.sd = (sd(cor.first, na.rm = T)), # standard deviation
+            preciseknow.se = preciseknow.sd/sqrt(n), # calculate standard error
+            preciseknow.lower = preciseknow.m - preciseknow.se, # calculate lower 95% CI
+            preciseknow.upper = preciseknow.m + preciseknow.se) # calculate upper 95% CI
+
+cal.sum5Figure7E$proxFac <- case_when(cal.sum5Figure7E$prox == 1 ~ "Proximal",
+                                     cal.sum5Figure7E$prox == 0 ~ "Distal")
+
+PreciseKnowledge_PropE<- ggplot(data=cal.sum5Figure7E, aes(x=agegroup, y = preciseknow.m, group = proxFac)) +
+  geom_line(aes(linetype=proxFac)) +
+  scale_linetype_manual(values=c("dotted", "solid"))+
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('English Speakers') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+          theme(legend.position = "top", legend.title = element_blank()) +
           theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
                 #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                 axis.line = element_line(colour = "black"))
@@ -641,6 +739,7 @@ p.lm2.1 <-  glmer(cor.first ~ language.sc + prox.sc + scale(ageyears) + (1|subji
 summary(p.lm2.1 )
 Anova(p.lm2.1, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) #main effect of age, proximity, and language
 ```
+
 
 ```{r predicting precise meaning III}
 #does language spoken, deictic status (past vs future),  or age (in years) predict successful placement of time words in the correct squares on the first try? [interaction term included in the model]
@@ -837,6 +936,12 @@ ggsave("plot.CalpreciseknowGerman.png",plot.preciseknowGerman, dpi = 300, height
 verbal <- d.all %>%
   filter(itemtype == "verbal" & item == "daysofweek" & agegroup != "adult") %>%
   group_by(agegroup) %>%
+  summarize(n =  n(),
+            Gcorrect.m = mean(correct, na.rm = T),
+            Ecorrect.m = mean(DaysOfWeek_Correct, na.rm = T)) 
+
+DOW_summary <- d.all  %>%
+  filter(itemtype == "verbal" & item == "daysofweek" & agegroup != "adult") %>%
   summarize(Gcorrect.m = mean(correct, na.rm = T),
             Ecorrect.m = mean(DaysOfWeek_Correct, na.rm = T)) 
 # reshape data from wide to long
@@ -1175,9 +1280,11 @@ ggplot(data = verbal.sum2, aes(x=agebin, y = correct.m.v, fill = language)) +
 
 ```{r graphing placement of sticker on first try}
 #recode agegroup
+cal.sum$agebin[cal.sum$agegroup == "3"] <- "Age 3"
 cal.sum$agebin[cal.sum$agegroup == "4"] <- "Age 4"
 cal.sum$agebin[cal.sum$agegroup == "5"] <- "Age 5"
 cal.sum$agebin[cal.sum$agegroup == "6"] <- "Age 6"
+cal.sum$agebin[cal.sum$agegruop == "7"]  <- "Age 7"
 
 #recode language spoken
 cal.sum$languagegroup[cal.sum$language == "english"] <- "English Speakers"
@@ -1209,7 +1316,160 @@ cal.sum3 <- cal.d2 %>%
             countCor.first = sum(cor.first))  # sum proportion correct for making bar graph instead of histogram
 ```
 
-```{r Plot Proportion Correct}
+```{r}
+calhist.e <- cal.d %>% #filter english speakers and create new data frame
+  filter(language == "english") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+calhist.g <- cal.d %>% #filter german speakers and create new data frame
+  filter(language == "german") %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "yesterday", "tomorrow", "aftertomorrow")))
+
+all <- ggplot(cal.d, aes(x = response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("box placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 30) +
+  facet_grid(language ~ item ~ agegroup)
+all
+
+calhist.e$agebin[calhist.e$agegroup == '3'] <- "Age 3"
+calhist.e$agebin[calhist.e$agegroup == '4'] <- "Age 4"
+calhist.e$agebin[calhist.e$agegroup == '5'] <- "Age 5"
+calhist.e$agebin[calhist.e$agegroup == '6'] <- "Age 6"
+calhist.e$agebin[calhist.e$agegroup == '7'] <- "Age 7"
+calhist.g$agebin[calhist.g$agegroup == '3'] <- "Age 3"
+calhist.g$agebin[calhist.g$agegroup == '4'] <- "Age 4"
+calhist.g$agebin[calhist.g$agegroup == '5'] <- "Age 5"
+calhist.g$agebin[calhist.g$agegroup == '6'] <- "Age 6"
+calhist.g$agebin[calhist.g$agegroup == '7'] <- "Age 7"
+  
+# Frequency distributions of first response only
+par(mfrow=c(1,1))
+E <- ggplot(calhist.e, aes(x=response1)) +
+  geom_histogram(position = "identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("square placement") +
+  ggtitle("English Speakers") +
+  ylim(0, 40) +
+  theme_classic() +
+  facet_grid(item ~ agebin)
+
+G <- ggplot(calhist.g, aes(x=response1)) +
+  geom_histogram(fill="white", position ="identity", colour = "grey40", alpha = 0.2, binwidth = 1) +
+  xlab("square placement") +
+  ggtitle("German Speakers") +
+  ylim(0, 40) +
+  theme_classic() +
+  facet_grid(item ~ agebin)
+
+histograms <- ggarrange(E, G, 
+          ncol = 2, nrow = 1)
+ggsave(histograms, file= "BoxPlacementByItem.jpeg", width = 10, height = 5, dpi = 300)
+
+calhist.g <- calhist.g %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                          item == "yesterday" & response1 ==  3 ~ "0",
+                          item == "aftertomorrow" & response1 ==  6 ~ "0",
+                          item == "beforeyesterday" & response1 ==  2 ~ "0")) # create new variable for filling correct placement
+
+calhist.g$ColorBar[is.na(calhist.g$ColorBar) == T] <- '1' # replace missing data with 0
+
+calhist.e <- calhist.e %>%
+  mutate(ColorBar = case_when(item == "tomorrow" & response1 == 5 ~ "0",
+                          item == "yesterday" & response1 ==  3 ~ "0",
+                          item == "aftertomorrow" & response1 ==  6 ~ "0",
+                          item == "beforeyesterday" & response1 ==  2 ~ "0"))
+calhist.e$ColorBar[is.na(calhist.e$ColorBar) == T] <- '1' # replace missing data with 0
+
+# recode Items for Facet Labels
+calhist.g$Term[calhist.g$item == 'tomorrow'] <- "tomorrow"
+calhist.g$Term[calhist.g$item == 'yesterday'] <- "yesterday"
+calhist.g$Term[calhist.g$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.g$Term[calhist.g$item == 'aftertomorrow'] <- "after-tomorrow"
+calhist.e$Term[calhist.e$item == 'tomorrow'] <- "tomorrow"
+calhist.e$Term[calhist.e$item == 'yesterday'] <- "yesterday"
+calhist.e$Term[calhist.e$item == 'beforeyesterday'] <- "before-yesterday"
+calhist.e$Term[calhist.e$item == 'aftertomorrow'] <- "after-tomorrow"
+
+cols <- c("0" = "red", "1" = "grey50")
+
+English_SquarePlacements <- ggplot(calhist.e, aes(x = factor(response1), fill = ColorBar)) +
+  geom_bar() +
+  #scale_fill_grey(end = 0.3, na.value = "grey50") +
+  scale_fill_manual(values = cols) +
+  theme_minimal(base_size = 10) +
+  facet_grid(Term~agebin) +
+  xlab("Square Placement") +
+  ylab("Participant Count") +
+  ylim(0, 35) +
+  ggtitle("English Speakers (n = 141)") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 10, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 10),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 10), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 10),
+        axis.text.x = element_text(family = "Times", color = "black", size = 10)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                # panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black")) +
+  theme(legend.position = "none") +
+  # customize facet labels
+  theme(
+      strip.text.x = element_text(
+        size = 10, color = "black", family = "Times"),
+      strip.text.y = element_text(
+        size = 10, color = "black", family = "Times")
+      )
+
+English_SquarePlacements
+
+German_SquarePlacements <- ggplot(calhist.g, aes(x = factor(response1), fill = ColorBar)) +
+  geom_bar() +
+  scale_fill_manual(values = cols) +
+  theme_minimal(base_size = 10) +
+  facet_grid(Term~agebin) +
+  xlab("Square Placement") +
+  ylab("Participant Count") +
+  ylim(0, 35) +
+  ggtitle("German Speakers (n = 134)") +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 10, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 10),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 10), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 10),
+        axis.text.x = element_text(family = "Times", color = "black", size = 10)) +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                #panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                axis.line = element_line(colour = "black")) +
+  theme(legend.position = "none") +
+  #customize facet labels
+  theme(
+      strip.text.x = element_text(
+        size = 10, color = "black", family = "Times"),
+      strip.text.y = element_text(
+        size = 10, color = "black", family = "Times")
+      )
+
+German_SquarePlacements
+
+Figure2 <- ggarrange(English_SquarePlacements, German_SquarePlacements, 
+          ncol = 2, nrow = 1)
+
+ggsave(Figure2, file= "Figure2.jpeg", width = 15, height = 8, dpi = 300)
+```
+
+Graph Correct First Placement (but show proportion of kids who placed sticker in each box)
+```{r}
+#exclude 3- and 7-year-olds from cal.sum4
+cal.sum4 <- cal.d2 %>%
+  mutate(item = factor(item, levels = c("beforeyesterday", "aftertomorrow","yesterday","tomorrow"))) %>%
+  group_by(language, agegroup, item, response1) %>%
+  summarize(n = n()) %>%
+  mutate(freq = n/sum(n))
+```
+
+
+```{r Plot Proportion Correct - sticker in correcvt box on first try}
 # first recode correct variable
 cal.e$correct_cat[cal.e$correct == 0] <- 'Incorrect'
 cal.e$correct_cat[cal.e$correct == 1] <- 'Correct'

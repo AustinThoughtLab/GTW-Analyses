@@ -67,7 +67,6 @@ d.all <- d.all %>%
                              weekday == "5" ~ "4",
                              weekday == "6" ~ "5",
                              weekday == "7" ~ "6"),
-         distfrommid = distfrommid_c1, # _c1/_c2 for ICC but for main analyses use distfrommid to avoid confusion
          language = as.factor(language),
          itemnum = as.factor(itemnum),
          exclude = replace_na(exclude, 0))
