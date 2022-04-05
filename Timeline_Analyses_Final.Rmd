@@ -45,7 +45,8 @@ d.all.timeline <- d.all %>%
 
 # adjust responses that were coded as being located exactly "now"
 d.TL <- d.all.timeline %>%
-  mutate(distfrommid2 = case_when(distfrommid == 0 ~ 0.01,
+  mutate(distfrommid_2 = case_when(distfrommid == 0 & item %in% c("dinner", "nextbday", "tonight", "tomorrow", "nextyear", "aftertomorrow", "nextweek") ~ 0.01,
+                                  distfrommid == 0 & item %in% c("lastbday", "lastweek", "yesterday", "breakfast","thismorning","lastyear", "beforeyesterday") ~ -0.01,
                                   distfrommid > 0 ~ distfrommid,
                                   distfrommid < 0 ~ distfrommid))
 
@@ -84,11 +85,23 @@ d.TL2$TempDistance <- factor(with(d.TL2, ifelse(item2 %in% c("breakfast","dinner
 ```
 
 ```{r code past/future placement}
-d.TL2$BNStatus <- with(d.TL2,ifelse(item %in% c("breakfast", "lastbday", "lastweek", "thismorning", "yesterday.3","yesterday.4", "lastyear", "beforeyesterday"), 1, 0))
-d.TL2$BNResponse <- with(d.TL2, ifelse(distfrommid2 < 0, 1, 0))
+d.TL2$BNStatus <- with(d.TL2,ifelse(item %in% c("breakfast", "lastbday", "lastweek", "thismorning", "yesterday","lastyear", "beforeyesterday"), 1, 0))
+d.TL2$BNResponse <- with(d.TL2, ifelse(distfrommid_2 < 0, 1, 0))
 
 d.TL2$BNCorrect <- with(d.TL2, ifelse(BNStatus == BNResponse, 1, 0))
 d.TL2$PastItem <- factor(d.TL2$BNStatus)
+
+#check that adults are getting DS right
+d.test <- d.TL2 %>%
+  filter(agegroup == "adult") %>%
+  group_by(item, language) %>%
+  summarize(n = n(),
+            DS.m = (mean(BNCorrect, na.rm = T))*100, # who got correct status (first answer)
+            DS.sd = (sd(BNCorrect, na.rm = T))*100, # standard deviation
+            DS.se = DS.sd/sqrt(n), # calculate standard error
+            DS.lower = DS.m - DS.se, # calculate lower 95% CI
+            DS.upper = DS.m + DS.se) # calculate upper 95% CI
+  
 
 # sum code variables for glmer
 # sum code language and itemtype
@@ -147,7 +160,8 @@ deicticstatus.sum
 
 # now within each language
 deicticstatus.sum1 <- d.TL2 %>%
-  group_by(agegroup, language) %>%
+  filter(agegroup == "adult") %>%
+  group_by(item, language) %>%
   summarize(n = n(),
             DS.m = (mean(BNCorrect, na.rm = T))*100, # who got correct status (first answer)
             DS.sd = (sd(BNCorrect, na.rm = T))*100, # standard deviation
@@ -545,33 +559,34 @@ rankorder.sum
 ```
 
 ```{r rank order N-back method}
-# this function is not working
 d.TL2$ComparedToPrevious <- ""
+d.TL2$CorrComparedToPrevious <- ""
 RelRankData <- subset(d.TL2, subjid=="nothing")
-for(sub_i in levels(d.TL2$subjid)){
-  for(trial_i in c(2,3,4,6,7,8,10,11,12,13,14,15,16)){
+#library ("berryFunctions")
+#RelRankData2 <- insertRows(RelRankData, 1:5573, new = NA)
+for(sub_i in (unique(d.TL2$subjid))){
+  for(trial_i in c(2,3,4,6,7,8,10,11,12,14,15,16)){
     foo <- subset(d.TL2, subjid==sub_i & TrialNum==trial_i)
     fooPrev <- subset(d.TL2, subjid==sub_i & TrialNum==trial_i-1)
-    foo$ComparedToPrevious <- ifelse(foo$Rank > fooPrev$Rank, "R","L")
-    foo$CorrComparedToPrevious <- ifelse(foo$CorrectRank > fooPrev$CorrectRank, "R","L")
-    RelRankData2 <- rbind(RelRankData, foo)
+    foo$ComparedToPrevious <- ifelse(foo$Rank > fooPrev$Rank, "R","L") # code where they placed trial in relation to previous trial (was it to the right or to the left?)
+    foo$CorrComparedToPrevious <- ifelse(foo$CorrectRank > fooPrev$CorrectRank, "R","L") # code where the correct placement is in relation to the previous trial (is it to the right or to the left?)
+    RelRankData <- rbind(RelRankData, foo) # cmobine all of this information into new dataframe
   }
-}
+  cat(sub_i, "\r") # these next three lines print the trial the loop that currently running
+  flush.console()
+  Sys.sleep(1)
+  }
 
-# this is gross but I did it manually in excel 
-
-write.csv(d.TL2,"d.TL2.csv")
-
-# now reading the data back in with new columns 
-RelRankData <- read.csv("d.TL2.csv")
-
-RelRankData$ComparedToPrevious <- ifelse(RelRankData$Rank > RelRankData$PrevRank, "R", "L")
-RelRankData$CorrComparedToPrevious <- ifelse(RelRankData$CorrectRank > RelRankData$PrevCorrectRank, "R", "L")
 RelRankData$AccRelRank <- with(RelRankData, ifelse(ComparedToPrevious == CorrComparedToPrevious, 1, 0))
-RelRankData <- subset(RelRankData, ageyears %in% c("3","4","5","6","7","adult"))
+SumAccRelRank <- RelRankData %>%
+  group_by(itemtype, agegroup) %>%
+  mutate(avgRelRankDif = mean(AccRelRank, na.rm = T))
+SumAccRelRank_1 <- RelRankData %>%
+  group_by(itemtype, agegroup, subjid) %>%
+  mutate(avgRelRankDif = mean(AccRelRank, na.rm = T))
 
-aggregate(AccRelRank~itemtype + ageyears, RelRankData, mean, na.rm=T)
-RelRankData.agg <- aggregate(AccRelRank~ageyears + itemtype  + subjid, RelRankData, mean, na.rm=T)
+# Katie left off here
+
 RelRankData.agg$itemtype <- factor(RelRankData.agg$itemtype)
 RelRankData.agg$subjid <- factor(RelRankData.agg$subjid)
 #xtabs(~BNCorrect + itemtype, RelRankData.agg)
