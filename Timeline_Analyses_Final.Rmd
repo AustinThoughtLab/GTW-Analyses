@@ -478,13 +478,17 @@ timelineDS.sumGer <- d.TL2 %>%
 plot.pastfutureGerman <- ggplot(data=timelineDS.sumGer, aes(x=agegroup, y=deictic1.m, ymin = deictic1.lower, ymax = deictic1.upper)) + 
   # geom_hline(yintercept=1, linetype="solid",color="black",size=1.3) +
   geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
-  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=deictic1.m + deictic1.sd, ymin=deictic1.m - deictic1.sd)) +
+  geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=deictic1.m + deictic1.se, ymin=deictic1.m - deictic1.se)) +
   scale_x_discrete(name = "German Speakers' Age (years)") +
   scale_y_continuous(name = "Mean Deictic Status Knowledge", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(axis.title = element_text(size=12))
+  theme(axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
+        axis.title.y = element_text(family = "Times", color = "black", size = 22),
+        axis.text.y = element_text(family = "Times", color = "black", size = 22), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 22),
+        axis.text.x = element_text(family = "Times", color = "black", size = 22))
 plot.pastfutureGerman
 
-ggsave("DS_GermanDev_Timeline.png", plot.pastfutureGerman, dpi = 300, height = 3, width = 3)
+ggsave("DS_GermanDev_Timeline.png", plot.pastfutureGerman, dpi = 300, height = 6, width = 6)
 
 timelineDS.sumEn <- d.TL2 %>%
   filter(language == "english") %>%
@@ -824,10 +828,14 @@ plot.pastfutureGerman2 <- ggplot(timelineRR.sumGer, aes(x=agegroup, y=RelRank.m,
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=RelRank.m + RelRank.sd, ymin=RelRank.m - RelRank.sd)) +
   scale_x_discrete(name = "German Speakers' Age (years)") +
   scale_y_continuous(name = "Mean Relative Order Knowledge", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5))
+  theme(axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
+        axis.title.y = element_text(family = "Times", color = "black", size = 22),
+        axis.text.y = element_text(family = "Times", color = "black", size = 22), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 22),
+        axis.text.x = element_text(family = "Times", color = "black", size = 22))
 plot.pastfutureGerman2
 
-ggsave("Order_GermanDev_Timeline.png", plot.pastfutureGerman2, dpi = 300, height = 3, width = 3)
+ggsave("Order_GermanDev_Timeline.png", plot.pastfutureGerman2, dpi = 300, height = 6, width = 6)
 
 timelineRR.sumEn <- RelRankData %>%
   filter(language == "english") %>%
