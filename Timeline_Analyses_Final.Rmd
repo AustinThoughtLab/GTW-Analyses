@@ -148,6 +148,12 @@ DeicticStatus_Timeline <- d.TL2 %>%
   add_significance()
 DeicticStatus_Timeline
 
+DeicticStatus_Timeline2 <- d.TL2 %>%
+  group_by(itemtype) %>%
+  pairwise_wilcox_test(formula = BNCorrect  ~ language.sc, p.adjust.method = "BH") %>%
+  add_significance()
+DeicticStatus_Timeline2
+
 
 #t.lm2 <- glmer(BNCorrect ~ itemtype.sc*scale(ageyears) + (1|subjid), family = 'binomial', data=d.TL2EN, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))) # language and age are significant predictors of BNCorrect
 #summary(t.lm2) 
@@ -410,7 +416,7 @@ prop_DS
 
 ## now create a mean deictic status accuracy for each type of timeline for each  age group
 DS.sum <- d.TL2 %>%
-  group_by(itemtype, agegroup) %>%
+  group_by(itemtype, agegroup, language) %>%
   summarize(n = n(),
             DS.m = (mean(BNCorrect, na.rm = T)), # who got correct status (first answer)
             DS.sd = (sd(BNCorrect, na.rm = T)), # standard deviation
@@ -421,9 +427,10 @@ DS.sum
 
 #Plot correct status by item type (for each language separately)
 # first english-speakers
-DS.timeline <- ggplot(data=DS.sum, aes(x=agegroup, y=DS.m, group=itemtype, color=itemtype)) +
-  geom_line(aes(color=itemtype))+
+DS.timeline <- ggplot(data=DS.sum, aes(x=agegroup, y=DS.m, group=language, color=language)) +
+  geom_line(aes(color=language))+
   geom_point() +
+  facet_wrap(~itemtype) +
   ylab('Proportion Correct') +
   xlab('') +
   ylim(0,1) +
@@ -440,7 +447,7 @@ DS.timeline <- ggplot(data=DS.sum, aes(x=agegroup, y=DS.m, group=itemtype, color
         axis.line = element_line(colour = "black"))
 DS.timeline
 
-ggsave("DS.timeline.png", DS.timeline, dpi = 300)
+ggsave("DS.timeline.png", DS.timeline, dpi = 300, width = 10, height = 5)
 
 ```
 
@@ -616,7 +623,7 @@ summary(Germrank.agg.lm) # age is highly significant
 
 # across both languages, within each agegroup what was performance like?
 rankorder.sum <- d.TL2 %>%
-  group_by(agegroup, language) %>%
+  group_by(agegroup, itemtype) %>%
   summarize(n = n(),
             RO.m = (mean(RankDif, na.rm = T)), # 
             RO.sd = (sd(RankDif, na.rm = T)), # standard deviation
@@ -624,6 +631,12 @@ rankorder.sum <- d.TL2 %>%
             RO.lower = RO.m - RO.se, # calculate lower 95% CI
             RO.upper = RO.m + RO.se) # calculate upper 95% CI
 rankorder.sum
+
+Order_Timeline2 <- d.TL2 %>%
+  group_by(agegroup, language) %>%
+  pairwise_wilcox_test(formula = RankDif ~ itemtype, p.adjust.method = "BH") %>%
+  add_significance()
+Order_Timeline2
 ```
 
 ```{r rank order N-back method}
@@ -675,7 +688,7 @@ Table_4 <- RelRankData %>%
 Table_4
 
 RelRankData_summary2 <- RelRankData %>%
-  group_by(itemtype, language, agegroup) %>%
+  group_by(language, agegroup) %>%
   summarize(n = n(),
           BackOrder.m = (mean(AccRelRank, na.rm = T)), # who got correct status (first answer)
           BackOrder.sd = (sd(AccRelRank, na.rm = T)), # standard deviation
@@ -727,8 +740,8 @@ with(subset(RelRankData, agegroup=="4" & language == "german"), t.test(x=AccRelR
 with(subset(RelRankData, agegroup %in% c("7", "adult")), t.test(AccRelRank ~ agegroup, var.equal=T)) # 7-year-olds not adult-like 
 
 with(subset(RelRankData, agegroup %in% c("7", "adult") & language == "german"), t.test(AccRelRank ~ agegroup, var.equal=T)) # 7-year-olds not adult-like 
+          
 with(subset(RelRankData, agegroup %in% c("7", "adult") & language == "english"), t.test(AccRelRank ~ agegroup, var.equal=T)) # 7-year-olds not adult-like 
-
 
 with(subset(RelRankData, agegroup == "3"), t.test(AccRelRank ~ language, var.equal = T)) # significant difference at age 3 between English- and German-speakers 
 with(subset(RelRankData, agegroup == "4"), t.test(AccRelRank ~ language, var.equal = T)) # no difference at age 4 between English- and German-speakers 
@@ -809,6 +822,42 @@ GermanBackOrder.timeline
 ggsave("BackOrder_graphs_4to7.jpeg", arrangeGrob(EnglishBackOrder.timeline, GermanBackOrder.timeline), height = 10, width = 7, dpi = 300)
 
 ```
+
+```{r graph proportion correct for N-back order knowledge collapsed across language groups}
+BackOrder.sum <- RelRankData %>%
+  group_by(itemtype, agegroup) %>%
+  summarize(n = n(),
+            BackOrder.m = (mean(AccRelRank, na.rm = T)), # who got correct status (first answer)
+            BackOrder.sd = (sd(AccRelRank, na.rm = T)), # standard deviation
+            BackOrder.se = BackOrder.sd/sqrt(n), # calculate standard error
+            BackOrder.lower = BackOrder.m - BackOrder.se, # calculate lower 95% CI
+            BackOrder.upper = BackOrder.m + BackOrder.se) # calculate upper 95% CI
+BackOrder.sum
+
+NBackOrder.timeline <- ggplot(data=BackOrder.sum, aes(x=agegroup, y=BackOrder.m, group=itemtype, color=itemtype, ymin = BackOrder.lower, ymax = BackOrder.upper)) +
+  geom_line(aes(color=itemtype))+
+  geom_errorbar(width = 0.2) +
+  geom_point() +
+  ylab('Proportion Correct') +
+  xlab('') +
+  ylim(0,1) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title=element_text(family = "Times", color = "black", size = 14, hjust = 0.5), 
+        axis.title.y = element_text(family = "Times", color = "black", size = 14),
+        axis.line.y = element_line(color = "black"),
+        axis.text.y = element_text(family = "Times", color = "black", size = 14), 
+        axis.title.x = element_text(family = "Times", color = "black", size = 14),
+        axis.text.x = element_text(family = "Times", color = "black", size = 14)) +
+  theme(legend.position = "top") +
+  theme(panel.border = element_rect(colour = "black", fill = NA, size = 1),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"))
+NBackOrder.timeline
+
+ggsave("BackOrder_PropCorrect.jpeg", NBackOrder.timeline, height = 7, width = 7, dpi = 300)
+
+```
+
 
 ```{r plot development of N-back measure of relative order knowledge on timeline task}
 timelineRR.sumGer <- RelRankData %>%

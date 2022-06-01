@@ -317,7 +317,7 @@ CorrectStatPlacements <- ggplot(data=cal.sumProp, aes(x=agegroup, y = deictic1.m
   geom_line(aes(linetype=item)) +
   scale_linetype_manual(values=c("twodash", "dotted", "solid", "longdash"))+
   geom_point() +
-  ylab('Proportion Correct (Past/Future Status)') +
+  ylab('Proportion Correct') +
   xlab('Age') +
   ylim(0,1) +
   theme_minimal(base_size = 14) +
@@ -565,6 +565,12 @@ p.lm1.main <- glmer(cor.first ~ language.sc + item_yesterday.sc+item_tomorrow.sc
 # once I increased the # of possible iterations the optimizer is allowed to have (i.e. to 100,000) convergence issues disappear 
 summary(p.lm1.main) 
 Anova(p.lm1.main, contrasts=list(topic=contr.sum, sys=contr.sum), Type=3) # all three main effects + language  age interaction
+
+preciseLang <- cal.d %>%
+  group_by(agegroup) %>%
+  pairwise_wilcox_test(formula = cor.first  ~ language.sc, p.adjust.method = "BH") %>%
+  add_significance()
+preciseLang
 
 #Wilcox_test for item level comparisons of cor.first by age (English-speakers only)
 PreciseMeaning_English <- cal.e2 %>%
@@ -1085,17 +1091,21 @@ English.test2
 ```
 
 ```{r overall performance on verbal questions - quick summary}
+verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
+#recalculate correct column for verbal questions only 
+verbal.d <- d.all %>%
+    filter(itemtype == "verbal" & agegroup %in% c('4', '5', '6', '7') & item != "daysofweek") %>% #filter only 5 verbal questions
+    mutate(correct = case_when(correctR == response ~ 1,
+                               correctR != response ~ 0))
 
 #' Calculate % of children who correctly answered verbal questions
-verbal_items <- c("aftertoday", "beforetoday", "yesterday", "tomorrow", "today")
 
 #calculate percentage of trials in which kids of each age group got verbal questions correct
-verbal.sum1 <- d.all %>%
-  filter(itemtype == "verbal" & item == verbal_items & agegroup %in% c('4', '5', '6', '7')) %>% #filter only 5 verbal questions
+verbal.sum1 <- verbal.d %>%
   group_by(language, agegroup, item) %>%
-  summarize(correct.m.v = mean(correct, na.rm=T), # % who answered correctly
+  summarize(n = n(),
+            correct.m.v = mean(correct, na.rm=T), # % who answered correctly
             sd.correct.v = sd(correct, na.rm=T), #calculate standard deviation
-            n = n(),
             se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
             correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
             correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
@@ -1105,7 +1115,7 @@ verbal.sum1
 verbal_data2 <- calv.d %>%
   filter(itemtype == "verbal" & item != "daysofweek" & agegroup %in% c('4', '5', '6', '7'))
 
-# does age or language predict Nichiren's performance on the 4 verbal questions (Excluding days of the week)?
+# does age or language predict chilren's performance on the 4 verbal questions (Excluding days of the week)?
 
 verbal.lm1 <- glmer(correct ~ language.sc*scale(ageyears) + (1|subjid), family = binomial(link='logit'), data=verbal_data2, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
 summary(verbal.lm1)
@@ -1135,18 +1145,21 @@ VerbalQuestions_Prop<- ggplot(data=verbal.sum1, aes(item, correct.m.v, fill = la
 VerbalQuestions_Prop
 
 ggsave("VerbalQuestions_Prop.jpeg",VerbalQuestions_Prop, dpi = 300, width = 10, height =5)
+```
 
+```{r overall performance on verbal questions - english only}
 # english only 
-verbal.sum1english <- d.all %>%
-  filter(itemtype == "verbal" & language == "english" & agegroup %in% c('4', '5', '6', '7') & item == verbal_items) %>% #filter only 5 verbal questions
+verbal.sum1english <- verbal_data2  %>%
+  filter(language == "english") %>%
   group_by(language, agegroup, item) %>%
-  summarize(correct.m.v = (mean(correct, na.rm=T)), # % who answered correctly
+  summarize(n = n(),
+            correct.m.v = (mean(correct, na.rm=T)), # % who answered correctly
             sd.correct.v = (sd(correct, na.rm=T)), #calculate standard deviation
-            n = n(),
             se.correct.v = sd.correct.v/sqrt(n), #calculate standard error
             correctv.lower = correct.m.v - se.correct.v, # calculate lower 95% CI
             correctv.upper = correct.m.v + se.correct.v, # calculate upper 95% CI
             countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
+
 
 VQ_PropEnglish<- ggplot(data=verbal.sum1english, aes(item, correct.m.v)) +
   geom_col() +
@@ -1232,6 +1245,15 @@ verbal.sum3 <- d.all %>%
             countCorrect.v = sum(correct, na.rm=T))  # sum proportion correct for making bar graph instead of histogram
 ```
 
+```{r verbal questions - each age?}
+verbal.5 <- d.all %>%
+  filter(itemtype == "verbal" & agegroup == "5" & language == "english", item == "tomorrow")
+
+verbal.6 <- d.all %>%
+  filter(itemtype == "verbal" & agegroup == "6" & language == "english")
+```
+
+
 ```{r comparing performance on verbal + deictic items}
 #Did kids who answered verbal Qs correctly also answer Deictic Qs correctly?
 ##use verbal Q's to predict deictic Q's performance
@@ -1262,6 +1284,7 @@ itemTest_D <- calv.d %>%
   add_significance()
 itemTest_D
 ```
+
 ```{r graph prop correct on verbal vs. deictic questions}
 
 calv.d.combined <- calv.d %>%
@@ -1301,7 +1324,6 @@ PropCorrectGraph
 
 ggsave("ItemType_PropLang.jpeg",PropCorrectGraph, dpi = 300, width = 10, height = 7)
 ```
-
 
 ```{r now split kids by correctr for daysoftheweek question}
 # use verbal Q's to predict deictic Q's performance; split kids by if they recited days of week or not]
