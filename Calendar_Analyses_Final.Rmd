@@ -848,7 +848,7 @@ plot.deicticEnglish <- ggplot(data=cal.sumProp2, aes(x=agegroup, y=deictic1.m)) 
   scale_x_discrete(name = "Age (years)") +
   ggtitle("Deictic Status") +
   scale_y_continuous(name = "Proportion Correct ", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
@@ -876,8 +876,8 @@ plot.remotenessEnglish <- ggplot(data=cal.sum5.2, aes(x=agegroup, y=remoteness.m
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.remote + remoteness.sd, ymin=cor.remote - remoteness.sd)) +
   scale_x_discrete(name = "Age (years)") +
   ggtitle("Temporal Remoteness") +
-  scale_y_continuous(name = "Proportion Correct", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-    theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  scale_y_continuous(name = "", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+    theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
@@ -905,8 +905,8 @@ plot.preciseknowEnglish <- ggplot(data=cal.sum5.3, aes(x=agegroup, y=preciseknow
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.first + preciseknow.sd, ymin=cor.first - preciseknow.sd)) +
   scale_x_discrete(name = "Age (years)") +
   ggtitle("Precise Knowledge") +
-  scale_y_continuous(name = "Proportion Correct", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  scale_y_continuous(name = "", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
@@ -936,9 +936,9 @@ plot.DSGerman <- ggplot(data=cal.sumProp2German, aes(x=agegroup, y=deictic1.m)) 
   geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=stat.correct.1 + deictic1.sd, ymin=stat.correct.1 - deictic1.sd)) +
   scale_x_discrete(name = "Age (years)") +
-  ggtitle("Deictic Status") +
+  ggtitle("") +
   scale_y_continuous(name = "Proportion Correct", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
@@ -964,9 +964,9 @@ plot.remotenessGerman <- ggplot(data=cal.sum5.2German, aes(x=agegroup, y=remoten
   geom_hline(yintercept=.33, linetype="dashed",color="red",size=1.3) +
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.remote + remoteness.sd, ymin=cor.remote - remoteness.sd)) +
   scale_x_discrete(name = "Age (years)") +
-  ggtitle("Temporal Remoteness") +
-  scale_y_continuous(name = "Proportion Correct", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  ggtitle("") +
+  scale_y_continuous(name = "", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
@@ -992,9 +992,9 @@ plot.preciseknowGerman <- ggplot(data=cal.sum5.3German, aes(x=agegroup, y=precis
   geom_hline(yintercept=.5, linetype="dashed",color="red",size=1.3) +
   geom_pointrange(size=1.5, position=position_dodge(width=0.3), aes(ymax=cor.first + preciseknow.sd, ymin=cor.first - preciseknow.sd)) +
   scale_x_discrete(name = "Age (years)") +
-  ggtitle("Precise Knowledge") +
-  scale_y_continuous(name = "Proportion Correct", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
-  theme(plot.title = element_text(size = 25, family = "Times", color = "black"),
+  ggtitle("") +
+  scale_y_continuous(name = "", breaks= c(.2, .3, .4, .5,.6,.7,.8,.9,1), limits = c(.2, 1)) +
+  theme(plot.title = element_text(family = "Times", color = "black", size = 25, hjust = 0.5),
         axis.title = element_text(family = "Times", color = "black", size = 22, hjust = 0.5),
         axis.title.y = element_text(family = "Times", color = "black", size = 22),
         axis.text.y = element_text(family = "Times", color = "black", size = 22), 
