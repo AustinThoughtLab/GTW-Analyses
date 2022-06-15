@@ -18,13 +18,22 @@ d.g <- d.g %>%
   mutate(language = 'german',
         linenum = ifelse(item=="lastyear", 3, linenum)) # there appears to be an error where this item was incorrectly attributed to line 4
 
+d.g3 <- read.csv('german3s_translated.csv')
+d.g3 <- d.g3 %>%
+  select(3:25)
+
+d.g <- rbind(d.g3, d.g) %>%
+  rename(distfrommid2 = distfrommid_2)
+
 d.g[d.g == "999"] <- NA # Note that 999 indicates missing data
 d.g[d.g == ""] <- NA # replace missing data and empty cells with NA
 
-d.e <- read.csv('english_data.csv')
+# katie left of here
+d.e <- read.csv('english_data2.csv')
 d.e <- d.e %>%
   select(-ID,-dob, -dot, -agedays, -monolingual, -rank, -comments, -experimenter) %>% # remove unnecessary columns
-  mutate(language = 'english')
+  mutate(language = 'english') %>%
+  rename(weekday = weekday.startingwMonday.)
 #d.a <- read.csv('TimelineData_All.csv', header=T) # read in adult timeline data
 #d.a <- d_a
 
